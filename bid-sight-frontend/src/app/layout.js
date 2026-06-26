@@ -1,8 +1,8 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Montserrat, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
   subsets: ["latin"],
 });
 
@@ -19,8 +19,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    lang="en"
+    className={`${montserrat.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
