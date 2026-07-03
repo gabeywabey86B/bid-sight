@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -26,6 +26,14 @@ function formatCount(value) {
   }
 
   return String(value);
+}
+
+function formatCompactMoney(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "N/A";
+  }
+
+  return `$${Number(value).toFixed(2)}`;
 }
 
 function extractAcademicYear(term) {
@@ -54,6 +62,50 @@ function sortBiddingRows(rows) {
   );
 }
 
+function getMedian(values) {
+  if (!values.length) {
+    return null;
+  }
+
+  const sortedValues = [...values].sort((left, right) => left - right);
+  const middleIndex = Math.floor(sortedValues.length / 2);
+
+  if (sortedValues.length % 2 === 0) {
+    return (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2;
+  }
+
+  return sortedValues[middleIndex];
+}
+
+function buildTermTrendData(rows) {
+  const termGroups = rows.reduce((groups, row) => {
+    const currentGroup = groups.get(row.term) ?? [];
+    currentGroup.push(row);
+    groups.set(row.term, currentGroup);
+    return groups;
+  }, new Map());
+
+  return [...termGroups.entries()].map(([term, termRows]) => {
+    const medianValues = termRows
+      .map((row) => row.median_bid)
+      .filter((value) => value !== null && value !== undefined)
+      .map(Number)
+      .filter((value) => !Number.isNaN(value));
+
+    const minValues = termRows
+      .map((row) => row.min_bid)
+      .filter((value) => value !== null && value !== undefined)
+      .map(Number)
+      .filter((value) => !Number.isNaN(value));
+
+    return {
+      term,
+      medianValue: getMedian(medianValues),
+      minValue: minValues.length ? Math.min(...minValues) : null,
+    };
+  });
+}
+
 function buildSimulationData(rows, sectionInfo) {
   const sortedRows = sortBiddingRows(rows);
   const latestRows = [...sortedRows].reverse();
@@ -68,6 +120,7 @@ function buildSimulationData(rows, sectionInfo) {
   return {
     selectedRow,
     historyRows: sortedRows,
+    termTrendRows: buildTermTrendData(sortedRows),
     sectionInfo,
   };
 }
@@ -95,6 +148,174 @@ function createHistoryRowId(row) {
     row.opening_vacancy,
     row.after_process_vacancy,
   ].join("|");
+}
+
+function TrendChart({ data }) {
+  const chartWidth = 720;
+  const chartHeight = 260;
+  const padding = { top: 20, right: 24, bottom: 44, left: 52 };
+  const drawableWidth = chartWidth - padding.left - padding.right;
+  const drawableHeight = chartHeight - padding.top - padding.bottom;
+  const allValues = data.flatMap((item) =>
+    [item.medianValue, item.minValue].filter(
+      (value) => value !== null && value !== undefined
+    )
+  );
+
+  if (!allValues.length) {
+    return (
+      <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+        No usable bid trend data is available for this course yet.
+      </div>
+    );
+  }
+
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues);
+  const range = maxValue - minValue || 1;
+  const yTicks = Array.from({ length: 4 }, (_, index) => {
+    const value = maxValue - (range * index) / 3;
+    return {
+      label: formatCompactMoney(value),
+      y:
+        padding.top +
+        (drawableHeight * index) / 3,
+    };
+  });
+
+  const getX = (index) => {
+    if (data.length === 1) {
+      return padding.left + drawableWidth / 2;
+    }
+
+    return padding.left + (drawableWidth * index) / (data.length - 1);
+  };
+
+  const getY = (value) =>
+    padding.top + ((maxValue - value) / range) * drawableHeight;
+
+  const buildSeriesPath = (key) => {
+    const points = data
+      .map((item, index) => {
+        const value = item[key];
+
+        if (value === null || value === undefined) {
+          return null;
+        }
+
+        return `${getX(index)},${getY(value)}`;
+      })
+      .filter(Boolean);
+
+    if (!points.length) {
+      return null;
+    }
+
+    return `M ${points.join(" L ")}`;
+  };
+
+  const medianPath = buildSeriesPath("medianValue");
+  const minPath = buildSeriesPath("minValue");
+
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
+      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-foreground" />
+          Median bid
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground" />
+          Min bid
+        </span>
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="h-[260px] min-w-[720px] w-full"
+          role="img"
+          aria-label="Median and minimum resulting bid trend by term"
+        >
+          {yTicks.map((tick) => (
+            <g key={tick.y}>
+              <line
+                x1={padding.left}
+                x2={chartWidth - padding.right}
+                y1={tick.y}
+                y2={tick.y}
+                stroke="currentColor"
+                strokeOpacity="0.12"
+              />
+              <text
+                x={padding.left - 10}
+                y={tick.y + 4}
+                textAnchor="end"
+                className="fill-muted-foreground text-[11px]"
+              >
+                {tick.label}
+              </text>
+            </g>
+          ))}
+
+          {medianPath ? (
+            <path
+              d={medianPath}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="text-foreground"
+            />
+          ) : null}
+
+          {minPath ? (
+            <path
+              d={minPath}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="text-muted-foreground"
+            />
+          ) : null}
+
+          {data.map((item, index) => {
+            const x = getX(index);
+
+            return (
+              <g key={item.term}>
+                {item.medianValue !== null ? (
+                  <circle
+                    cx={x}
+                    cy={getY(item.medianValue)}
+                    r="4"
+                    className="fill-foreground"
+                  />
+                ) : null}
+
+                {item.minValue !== null ? (
+                  <circle
+                    cx={x}
+                    cy={getY(item.minValue)}
+                    r="4"
+                    className="fill-muted-foreground"
+                  />
+                ) : null}
+
+                <text
+                  x={x}
+                  y={chartHeight - 12}
+                  textAnchor="middle"
+                  className="fill-muted-foreground text-[11px]"
+                >
+                  {item.term}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
 }
 
 const BIDDING_ROW_SELECT =
@@ -166,6 +387,7 @@ export default function BidSimulationPage() {
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [rerollToken, setRerollToken] = useState(0);
+  const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
 
   useEffect(() => {
     let isActive = true;
@@ -262,6 +484,7 @@ export default function BidSimulationPage() {
 
       setSimulationData(buildSimulationData(courseRows, sectionInfo ?? null));
       setBidAmount("");
+      setIsHistoryCollapsed(false);
       setStatus("ready");
     }
 
@@ -274,6 +497,7 @@ export default function BidSimulationPage() {
 
   const selectedRow = simulationData?.selectedRow;
   const historyRows = simulationData?.historyRows ?? [];
+  const termTrendRows = simulationData?.termTrendRows ?? [];
   const schedule = simulationData?.sectionInfo?.schedule ?? "TBA";
   const courseAreas = simulationData?.sectionInfo?.course_areas ?? "";
   const courseAreasPreview = courseAreas
@@ -357,51 +581,68 @@ export default function BidSimulationPage() {
                 </p>
               </div>
 
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-left text-sm">
-                  <thead>
-                    <tr className="text-muted-foreground">
-                      <th className="pb-2 font-medium">Term</th>
-                      <th className="pb-2 font-medium">Section</th>
-                      <th className="pb-2 font-medium">Bidding Window</th>
-                      <th className="pb-2 font-medium">Median</th>
-                      <th className="pb-2 font-medium">Min</th>
-                      <th className="pb-2 font-medium">Vacancy</th>
-                      <th className="pb-2 font-medium">Opening</th>
-                      <th className="pb-2 font-medium">Enrolled</th>
-                      <th className="pb-2 font-medium">Post-Process</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historyRows.map((row, index) => (
-                      <tr
-                        key={`${createHistoryRowId(row)}-${index}`}
-                        className="rounded-lg bg-muted/40"
-                      >
-                        <td className="rounded-l-lg px-3 py-3 font-medium">
-                          {row.term}
-                        </td>
-                        <td className="px-3 py-3">{row.section}</td>
-                        <td className="px-3 py-3 font-medium">
-                          {row.bidding_window}
-                        </td>
-                        <td className="px-3 py-3">${formatMoney(row.median_bid)}</td>
-                        <td className="px-3 py-3">${formatMoney(row.min_bid)}</td>
-                        <td className="px-3 py-3">{formatCount(row.vacancy)}</td>
-                        <td className="px-3 py-3">
-                          {formatCount(row.opening_vacancy)}
-                        </td>
-                        <td className="px-3 py-3">
-                          {formatCount(row.enrolled_students)}
-                        </td>
-                        <td className="rounded-r-lg px-3 py-3">
-                          {formatCount(row.after_process_vacancy)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="mt-4 flex justify-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setIsHistoryCollapsed((current) => !current)
+                  }
+                >
+                  {isHistoryCollapsed ? <ChevronDown /> : <ChevronUp />}
+                  {isHistoryCollapsed ? "Show past results" : "Hide past results"}
+                </Button>
               </div>
+
+              <TrendChart data={termTrendRows} />
+
+              {!isHistoryCollapsed ? (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-left text-sm">
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="pb-2 font-medium">Term</th>
+                        <th className="pb-2 font-medium">Section</th>
+                        <th className="pb-2 font-medium">Bidding Window</th>
+                        <th className="pb-2 font-medium">Median</th>
+                        <th className="pb-2 font-medium">Min</th>
+                        <th className="pb-2 font-medium">Vacancy</th>
+                        <th className="pb-2 font-medium">Opening</th>
+                        <th className="pb-2 font-medium">Enrolled</th>
+                        <th className="pb-2 font-medium">Post-Process</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyRows.map((row, index) => (
+                        <tr
+                          key={`${createHistoryRowId(row)}-${index}`}
+                          className="rounded-lg bg-muted/40"
+                        >
+                          <td className="rounded-l-lg px-3 py-3 font-medium">
+                            {row.term}
+                          </td>
+                          <td className="px-3 py-3">{row.section}</td>
+                          <td className="px-3 py-3 font-medium">
+                            {row.bidding_window}
+                          </td>
+                          <td className="px-3 py-3">${formatMoney(row.median_bid)}</td>
+                          <td className="px-3 py-3">${formatMoney(row.min_bid)}</td>
+                          <td className="px-3 py-3">{formatCount(row.vacancy)}</td>
+                          <td className="px-3 py-3">
+                            {formatCount(row.opening_vacancy)}
+                          </td>
+                          <td className="px-3 py-3">
+                            {formatCount(row.enrolled_students)}
+                          </td>
+                          <td className="rounded-r-lg px-3 py-3">
+                            {formatCount(row.after_process_vacancy)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
