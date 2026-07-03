@@ -77,6 +77,23 @@ function getMedian(values) {
   return sortedValues[middleIndex];
 }
 
+function hasMeaningfulBidValue(row) {
+  const medianValue = Number(row.median_bid);
+  const minValue = Number(row.min_bid);
+  const hasMedianValue =
+    row.median_bid !== null &&
+    row.median_bid !== undefined &&
+    !Number.isNaN(medianValue) &&
+    medianValue > 0;
+  const hasPositiveMinValue =
+    row.min_bid !== null &&
+    row.min_bid !== undefined &&
+    !Number.isNaN(minValue) &&
+    minValue > 0;
+
+  return hasMedianValue || hasPositiveMinValue;
+}
+
 function buildTermTrendData(rows) {
   const termGroups = rows.reduce((groups, row) => {
     const currentGroup = groups.get(row.term) ?? [];
@@ -86,17 +103,19 @@ function buildTermTrendData(rows) {
   }, new Map());
 
   return [...termGroups.entries()].map(([term, termRows]) => {
-    const medianValues = termRows
+    const meaningfulRows = termRows.filter(hasMeaningfulBidValue);
+
+    const medianValues = meaningfulRows
       .map((row) => row.median_bid)
       .filter((value) => value !== null && value !== undefined)
       .map(Number)
-      .filter((value) => !Number.isNaN(value));
+      .filter((value) => !Number.isNaN(value) && value > 0);
 
-    const minValues = termRows
+    const minValues = meaningfulRows
       .map((row) => row.min_bid)
       .filter((value) => value !== null && value !== undefined)
       .map(Number)
-      .filter((value) => !Number.isNaN(value));
+      .filter((value) => !Number.isNaN(value) && value > 0);
 
     return {
       term,
