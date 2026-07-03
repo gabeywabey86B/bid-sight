@@ -47,11 +47,11 @@ export default function RootLayout({ children }) {
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-6">
               <div className="flex items-center gap-8">
                 <Link href="/" className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sidebar-primary text-xl font-semibold text-sidebar-primary-foreground">
+                  <div className="flex h-13 w-13 items-center justify-center rounded-xl bg-sidebar-primary text-xl font-semibold text-sidebar-primary-foreground">
                     BS
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Drill your bids
                     </p>
                     <p className="text-4xl font-semibold tracking-tight text-sidebar-foreground">

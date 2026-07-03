@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,15 @@ function formatCompactMoney(value) {
   return `$${Number(value).toFixed(2)}`;
 }
 
+function formatSignedMoney(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "N/A";
+  }
+
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}$${Number(value).toFixed(2)}`;
+}
+
 function extractAcademicYear(term) {
   if (!term) {
     return "N/A";
@@ -45,8 +54,8 @@ function extractAcademicYear(term) {
   return match ? match[1] : term;
 }
 
-function sortBiddingRows(rows) {
-  return [...rows].sort((left, right) =>
+function compareBiddingRows(left, right) {
+  return (
     left.term.localeCompare(right.term, undefined, {
       numeric: true,
       sensitivity: "base",
@@ -60,6 +69,10 @@ function sortBiddingRows(rows) {
       sensitivity: "base",
     })
   );
+}
+
+function sortBiddingRows(rows) {
+  return [...rows].sort(compareBiddingRows);
 }
 
 function getMedian(values) {
@@ -94,6 +107,15 @@ function hasMeaningfulBidValue(row) {
   return hasMedianValue || hasPositiveMinValue;
 }
 
+function isBeforeTargetTerm(row, targetRow) {
+  return (
+    row.term.localeCompare(targetRow.term, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }) < 0
+  );
+}
+
 function buildTermTrendData(rows) {
   const termGroups = rows.reduce((groups, row) => {
     const currentGroup = groups.get(row.term) ?? [];
@@ -125,22 +147,58 @@ function buildTermTrendData(rows) {
   });
 }
 
-function buildSimulationData(rows, sectionInfo) {
-  const sortedRows = sortBiddingRows(rows);
-  const latestRows = [...sortedRows].reverse();
-  const selectedRow =
-    latestRows.find(
-      (row) =>
-        row.median_bid !== null ||
-        row.min_bid !== null ||
-        row.opening_vacancy !== null
-    ) ?? latestRows[0];
+function getNumericBidValue(value) {
+  const parsedValue = Number(value);
+
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  if (Number.isNaN(parsedValue)) {
+    return null;
+  }
+
+  return parsedValue;
+}
+
+function buildBidComparison(enteredBid, actualValue) {
+  const numericActual = getNumericBidValue(actualValue);
+
+  if (numericActual === null) {
+    return null;
+  }
+
+  const difference = enteredBid - numericActual;
 
   return {
-    selectedRow,
-    historyRows: sortedRows,
-    termTrendRows: buildTermTrendData(sortedRows),
-    sectionInfo,
+    actualValue: numericActual,
+    difference,
+    absoluteDifference: Math.abs(difference),
+  };
+}
+
+function buildSimulationData(rows) {
+  const sortedRows = sortBiddingRows(rows);
+  const candidateRows = sortedRows.filter(
+    (row) =>
+      row.median_bid !== null ||
+      row.min_bid !== null ||
+      row.opening_vacancy !== null
+  );
+  const randomPool = candidateRows.length ? candidateRows : sortedRows;
+  const targetRow =
+    randomPool[Math.floor(Math.random() * randomPool.length)] ?? null;
+
+  if (!targetRow) {
+    return null;
+  }
+
+  const priorRows = sortedRows.filter((row) => isBeforeTargetTerm(row, targetRow));
+
+  return {
+    targetRow,
+    priorRows,
+    termTrendRows: buildTermTrendData(priorRows),
   };
 }
 
@@ -184,7 +242,8 @@ function TrendChart({ data }) {
   if (!allValues.length) {
     return (
       <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-        No usable bid trend data is available for this course yet.
+        No usable bid trend data is available from earlier offerings for this
+        course.
       </div>
     );
   }
@@ -196,9 +255,7 @@ function TrendChart({ data }) {
     const value = maxValue - (range * index) / 3;
     return {
       label: formatCompactMoney(value),
-      y:
-        padding.top +
-        (drawableHeight * index) / 3,
+      y: padding.top + (drawableHeight * index) / 3,
     };
   });
 
@@ -254,7 +311,7 @@ function TrendChart({ data }) {
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           className="h-[260px] min-w-[720px] w-full"
           role="img"
-          aria-label="Median and minimum resulting bid trend by term"
+          aria-label="Median and minimum resulting bid trend by prior term"
         >
           {yTicks.map((tick) => (
             <g key={tick.y}>
@@ -337,6 +394,35 @@ function TrendChart({ data }) {
   );
 }
 
+function ResultMetricCard({ title, comparison }) {
+  if (!comparison) {
+    return (
+      <div className="rounded-lg bg-muted/50 p-4">
+        <p className="text-sm text-muted-foreground">{title}</p>
+        <p className="mt-2 text-2xl font-semibold">N/A</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No recorded value is available for this target round.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg bg-muted/50 p-4">
+      <p className="text-sm text-muted-foreground">{title}</p>
+      <p className="mt-2 text-2xl font-semibold">
+        {formatCompactMoney(comparison.actualValue)}
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Difference: {formatSignedMoney(comparison.difference)}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Absolute gap: {formatCompactMoney(comparison.absoluteDifference)}
+      </p>
+    </div>
+  );
+}
+
 const BIDDING_ROW_SELECT =
   "course_id,bidding_window,term,session_bidding_window,course_code,description,section,median_bid,min_bid,vacancy,opening_vacancy,before_process_vacancy,after_process_vacancy,dice,enrolled_students,instructor,school_department,url";
 
@@ -407,6 +493,7 @@ export default function BidSimulationPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [rerollToken, setRerollToken] = useState(0);
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+  const [hasSubmittedBid, setHasSubmittedBid] = useState(false);
 
   useEffect(() => {
     let isActive = true;
@@ -458,17 +545,10 @@ export default function BidSimulationPage() {
         return;
       }
 
-      const courseRows = biddingRows;
-      const representativeRow =
-        courseRows.find(
-          (row) =>
-            row.median_bid !== null ||
-            row.min_bid !== null ||
-            row.opening_vacancy !== null
-        ) ?? courseRows[0];
-      const courseId = representativeRow?.course_id;
+      const simulation = buildSimulationData(biddingRows);
+      const courseId = simulation?.targetRow?.course_id;
 
-      if (!courseId) {
+      if (!courseId || !simulation?.targetRow) {
         if (!isActive) {
           return;
         }
@@ -501,8 +581,12 @@ export default function BidSimulationPage() {
         return;
       }
 
-      setSimulationData(buildSimulationData(courseRows, sectionInfo ?? null));
+      setSimulationData({
+        ...simulation,
+        sectionInfo: sectionInfo ?? null,
+      });
       setBidAmount("");
+      setHasSubmittedBid(false);
       setIsHistoryCollapsed(false);
       setStatus("ready");
     }
@@ -514,8 +598,8 @@ export default function BidSimulationPage() {
     };
   }, [rerollToken]);
 
-  const selectedRow = simulationData?.selectedRow;
-  const historyRows = simulationData?.historyRows ?? [];
+  const targetRow = simulationData?.targetRow;
+  const priorRows = simulationData?.priorRows ?? [];
   const termTrendRows = simulationData?.termTrendRows ?? [];
   const schedule = simulationData?.sectionInfo?.schedule ?? "TBA";
   const courseAreas = simulationData?.sectionInfo?.course_areas ?? "";
@@ -523,21 +607,52 @@ export default function BidSimulationPage() {
     ? courseAreas.split("|").slice(0, 3).join(" | ")
     : "No course areas available.";
 
+  const numericBidAmount = useMemo(() => {
+    if (bidAmount.trim() === "") {
+      return null;
+    }
+
+    const parsedValue = Number(bidAmount);
+
+    if (Number.isNaN(parsedValue) || parsedValue < 0) {
+      return null;
+    }
+
+    return parsedValue;
+  }, [bidAmount]);
+
+  const medianComparison = useMemo(() => {
+    if (numericBidAmount === null || !targetRow || !hasSubmittedBid) {
+      return null;
+    }
+
+    return buildBidComparison(numericBidAmount, targetRow.median_bid);
+  }, [hasSubmittedBid, numericBidAmount, targetRow]);
+
+  const minComparison = useMemo(() => {
+    if (numericBidAmount === null || !targetRow || !hasSubmittedBid) {
+      return null;
+    }
+
+    return buildBidComparison(numericBidAmount, targetRow.min_bid);
+  }, [hasSubmittedBid, numericBidAmount, targetRow]);
+
   return (
     <section className="min-h-screen bg-background px-6 py-12">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
             <p className="text-sm font-medium text-muted-foreground">
-              Bid Simulation
+              Training Mode
             </p>
             <div className="space-y-2">
               <p className="text-3xl leading-tight font-semibold tracking-tight">
-                {selectedRow?.description ?? "Live course bid simulation"}
+                {targetRow?.description ?? "Historical bid training"}
               </p>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Randomly loaded from Supabase using one course and its full
-                bidding history across past offerings.
+                Study only the history available before this target offering,
+                place your bid, then compare it against that round&apos;s actual
+                results.
               </p>
             </div>
           </div>
@@ -549,19 +664,36 @@ export default function BidSimulationPage() {
               disabled={status === "loading"}
             >
               <RefreshCw className={status === "loading" ? "animate-spin" : ""} />
-              Reroll course
+              Reroll target
             </Button>
 
-            <label className="flex w-full items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 sm:w-auto">
-              <span className="text-sm font-medium text-muted-foreground">$</span>
-              <input
-                value={bidAmount}
-                onChange={(event) => setBidAmount(event.target.value)}
-                inputMode="decimal"
-                placeholder="Enter bid"
-                className="w-full min-w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </label>
+            <div className="flex w-full flex-col gap-3 sm:w-auto">
+              <label className="flex w-full items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 sm:w-auto">
+                <span className="text-sm font-medium text-muted-foreground">
+                  $
+                </span>
+                <input
+                  value={bidAmount}
+                  onChange={(event) => {
+                    setBidAmount(event.target.value);
+                    if (hasSubmittedBid) {
+                      setHasSubmittedBid(false);
+                    }
+                  }}
+                  inputMode="decimal"
+                  placeholder="Enter bid"
+                  className="w-full min-w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  aria-label="Enter your bid"
+                />
+              </label>
+
+              <Button
+                onClick={() => setHasSubmittedBid(true)}
+                disabled={numericBidAmount === null || status !== "ready"}
+              >
+                Submit bid
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -583,20 +715,22 @@ export default function BidSimulationPage() {
           />
         ) : null}
 
-        {status === "ready" && selectedRow ? (
+        {status === "ready" && targetRow ? (
           <>
             <div className="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">
-                    Historical bidding results
+                    Prior historical context
                   </p>
                   <p className="text-lg font-semibold">
-                    Past results for {selectedRow.course_code}
+                    Earlier results for {targetRow.course_code} before{" "}
+                    {targetRow.term}
                   </p>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Showing {historyRows.length} rows across past offerings
+                  Showing {priorRows.length} earlier row
+                  {priorRows.length === 1 ? "" : "s"}
                 </p>
               </div>
 
@@ -604,147 +738,171 @@ export default function BidSimulationPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    setIsHistoryCollapsed((current) => !current)
-                  }
+                  onClick={() => setIsHistoryCollapsed((current) => !current)}
                 >
                   {isHistoryCollapsed ? <ChevronDown /> : <ChevronUp />}
-                  {isHistoryCollapsed ? "Show past results" : "Hide past results"}
+                  {isHistoryCollapsed ? "Show prior results" : "Hide prior results"}
                 </Button>
               </div>
 
-              <TrendChart data={termTrendRows} />
+              {priorRows.length ? (
+                <>
+                  <TrendChart data={termTrendRows} />
 
-              {!isHistoryCollapsed ? (
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-left text-sm">
-                    <thead>
-                      <tr className="text-muted-foreground">
-                        <th className="pb-2 font-medium">Term</th>
-                        <th className="pb-2 font-medium">Section</th>
-                        <th className="pb-2 font-medium">Bidding Window</th>
-                        <th className="pb-2 font-medium">Median</th>
-                        <th className="pb-2 font-medium">Min</th>
-                        <th className="pb-2 font-medium">Vacancy</th>
-                        <th className="pb-2 font-medium">Opening</th>
-                        <th className="pb-2 font-medium">Enrolled</th>
-                        <th className="pb-2 font-medium">Post-Process</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {historyRows.map((row, index) => (
-                        <tr
-                          key={`${createHistoryRowId(row)}-${index}`}
-                          className="rounded-lg bg-muted/40"
-                        >
-                          <td className="rounded-l-lg px-3 py-3 font-medium">
-                            {row.term}
-                          </td>
-                          <td className="px-3 py-3">{row.section}</td>
-                          <td className="px-3 py-3 font-medium">
-                            {row.bidding_window}
-                          </td>
-                          <td className="px-3 py-3">${formatMoney(row.median_bid)}</td>
-                          <td className="px-3 py-3">${formatMoney(row.min_bid)}</td>
-                          <td className="px-3 py-3">{formatCount(row.vacancy)}</td>
-                          <td className="px-3 py-3">
-                            {formatCount(row.opening_vacancy)}
-                          </td>
-                          <td className="px-3 py-3">
-                            {formatCount(row.enrolled_students)}
-                          </td>
-                          <td className="rounded-r-lg px-3 py-3">
-                            {formatCount(row.after_process_vacancy)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {!isHistoryCollapsed ? (
+                    <div className="mt-4 overflow-x-auto">
+                      <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-left text-sm">
+                        <thead>
+                          <tr className="text-muted-foreground">
+                            <th className="pb-2 font-medium">Term</th>
+                            <th className="pb-2 font-medium">Section</th>
+                            <th className="pb-2 font-medium">Bidding Window</th>
+                            <th className="pb-2 font-medium">Median</th>
+                            <th className="pb-2 font-medium">Min</th>
+                            <th className="pb-2 font-medium">Vacancy</th>
+                            <th className="pb-2 font-medium">Opening</th>
+                            <th className="pb-2 font-medium">Enrolled</th>
+                            <th className="pb-2 font-medium">Post-Process</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {priorRows.map((row, index) => (
+                            <tr
+                              key={`${createHistoryRowId(row)}-${index}`}
+                              className="rounded-lg bg-muted/40"
+                            >
+                              <td className="rounded-l-lg px-3 py-3 font-medium">
+                                {row.term}
+                              </td>
+                              <td className="px-3 py-3">{row.section}</td>
+                              <td className="px-3 py-3 font-medium">
+                                {row.bidding_window}
+                              </td>
+                              <td className="px-3 py-3">
+                                ${formatMoney(row.median_bid)}
+                              </td>
+                              <td className="px-3 py-3">
+                                ${formatMoney(row.min_bid)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {formatCount(row.vacancy)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {formatCount(row.opening_vacancy)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {formatCount(row.enrolled_students)}
+                              </td>
+                              <td className="rounded-r-lg px-3 py-3">
+                                {formatCount(row.after_process_vacancy)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                  No earlier history is available for this course before the
+                  selected target term.
                 </div>
-              ) : null}
+              )}
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Course details
+                  Target course details
                 </p>
                 <div className="mt-4 space-y-3">
                   <p className="text-lg leading-6">
-                    School: {selectedRow.school_department || "N/A"}
+                    School: {targetRow.school_department || "N/A"}
                   </p>
                   <p className="text-lg leading-6">
-                    Course Code: {selectedRow.course_code || "N/A"}
+                    Course Code: {targetRow.course_code || "N/A"}
                   </p>
                   <p className="text-lg leading-6">
-                    Academic Year: {extractAcademicYear(selectedRow.term)}
+                    Academic Year: {extractAcademicYear(targetRow.term)}
                   </p>
                   <p className="text-lg leading-6">
-                    Term: {selectedRow.term || "N/A"}
+                    Term: {targetRow.term || "N/A"}
                   </p>
                   <p className="text-lg leading-6">
-                    Section: {selectedRow.section || "N/A"}
+                    Section: {targetRow.section || "N/A"}
                   </p>
                   <p className="text-lg leading-6">
-                    Professor: {selectedRow.instructor || "N/A"}
+                    Professor: {targetRow.instructor || "N/A"}
+                  </p>
+                  <p className="text-lg leading-6">Timing: {schedule}</p>
+                  <p className="text-lg leading-6">
+                    Bidding Window: {targetRow.bidding_window || "N/A"}
                   </p>
                   <p className="text-lg leading-6">
-                    Timing: {schedule}
-                  </p>
-                  <p className="text-lg leading-6">
-                    Bidding Window: {selectedRow.bidding_window || "N/A"}
-                  </p>
-                  <p className="text-lg leading-6">
-                    Opening Vacancy: {formatCount(selectedRow.opening_vacancy)}
+                    Opening Vacancy: {formatCount(targetRow.opening_vacancy)}
                   </p>
                 </div>
               </div>
 
               <div className="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Snapshot
-                </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg bg-muted/50 p-4">
-                    <p className="text-sm text-muted-foreground">Current median bid</p>
-                    <p className="mt-2 text-2xl font-semibold">
-                      ${formatMoney(selectedRow.median_bid)}
+                {hasSubmittedBid ? (
+                  <>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Your result
                     </p>
-                  </div>
-                  <div className="rounded-lg bg-muted/50 p-4">
-                    <p className="text-sm text-muted-foreground">Current min bid</p>
-                    <p className="mt-2 text-2xl font-semibold">
-                      ${formatMoney(selectedRow.min_bid)}
+                    <div className="mt-4 rounded-lg bg-muted/30 p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Submitted bid
+                      </p>
+                      <p className="mt-2 text-3xl font-semibold">
+                        {formatCompactMoney(numericBidAmount)}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <ResultMetricCard
+                        title="Target round median"
+                        comparison={medianComparison}
+                      />
+                      <ResultMetricCard
+                        title="Target round minimum"
+                        comparison={minComparison}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Bid prompt
                     </p>
-                  </div>
-                  <div className="rounded-lg bg-muted/50 p-4">
-                    <p className="text-sm text-muted-foreground">
-                      Before processing vacancy
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold">
-                      {formatCount(selectedRow.before_process_vacancy)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-muted/50 p-4">
-                    <p className="text-sm text-muted-foreground">Dice count</p>
-                    <p className="mt-2 text-2xl font-semibold">
-                      {formatCount(selectedRow.dice)}
-                    </p>
-                  </div>
-                </div>
+                    <div className="mt-4 space-y-3 rounded-lg bg-muted/30 p-4">
+                      <p className="text-base leading-6">
+                        Use the earlier history on this page to decide what you
+                        would bid for this specific target round.
+                      </p>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        After you submit, this panel will reveal how far your bid
+                        was from the actual median and minimum for{" "}
+                        {targetRow.course_code} {targetRow.section} in{" "}
+                        {targetRow.term}.
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <div className="mt-4 space-y-3 rounded-lg bg-muted/30 p-4">
                   <p className="text-sm font-medium text-muted-foreground">
                     Session and eligibility preview
                   </p>
                   <p className="text-sm leading-6">
-                    Session: {selectedRow.session_bidding_window || "N/A"}
+                    Session: {targetRow.session_bidding_window || "N/A"}
                   </p>
                   <p className="text-sm leading-6 text-muted-foreground">
                     {courseAreasPreview}
                   </p>
                   <a
-                    href={simulationData.sectionInfo?.url || selectedRow.url || "#"}
+                    href={simulationData.sectionInfo?.url || targetRow.url || "#"}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
