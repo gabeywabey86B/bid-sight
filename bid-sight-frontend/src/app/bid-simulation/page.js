@@ -892,170 +892,6 @@ export default function BidSimulationPage() {
           />
         ) : null}
 
-        {status === "ready" && targetRow ? (
-          <>
-            <div className="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Prior historical context
-                  </p>
-                  <p className="text-lg font-semibold">
-                    Earlier results for {targetRow.course_code} before{" "}
-                    {targetRow.term}
-                  </p>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Showing {filteredPriorRows.length} earlier row
-                  {filteredPriorRows.length === 1 ? "" : "s"}
-                  {hasActiveFilters ? ` of ${priorRows.length}` : ""}
-                </p>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-3">
-                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto]">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Term</span>
-                    <select
-                      value={termFilter}
-                      onChange={(event) => setTermFilter(event.target.value)}
-                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
-                    >
-                      <option value="all">All terms</option>
-                      {termOptions.map((term) => (
-                        <option key={term} value={term}>
-                          {term}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Section</span>
-                    <select
-                      value={sectionFilter}
-                      onChange={(event) => setSectionFilter(event.target.value)}
-                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
-                    >
-                      <option value="all">All sections</option>
-                      {sectionOptions.map((section) => (
-                        <option key={section} value={section}>
-                          {section}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Bidding Window</span>
-                    <select
-                      value={biddingWindowFilter}
-                      onChange={(event) =>
-                        setBiddingWindowFilter(event.target.value)
-                      }
-                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
-                    >
-                      <option value="all">All bidding windows</option>
-                      {biddingWindowOptions.map((biddingWindow) => (
-                        <option key={biddingWindow} value={biddingWindow}>
-                          {biddingWindow}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <div className="flex items-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setTermFilter("all");
-                        setSectionFilter("all");
-                        setBiddingWindowFilter("all");
-                      }}
-                      disabled={!hasActiveFilters}
-                    >
-                      Clear filters
-                    </Button>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsHistoryCollapsed((current) => !current)}
-                >
-                  {isHistoryCollapsed ? <ChevronDown /> : <ChevronUp />}
-                  {isHistoryCollapsed ? "Show prior results" : "Hide prior results"}
-                </Button>
-              </div>
-
-              {filteredPriorRows.length ? (
-                <>
-                  <TrendChart data={filteredTermTrendRows} />
-
-                  {!isHistoryCollapsed ? (
-                    <div className="mt-4 overflow-x-auto">
-                      <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-left text-sm">
-                        <thead>
-                          <tr className="text-muted-foreground">
-                            <th className="pb-2 font-medium">Term</th>
-                            <th className="pb-2 font-medium">Section</th>
-                            <th className="pb-2 font-medium">Bidding Window</th>
-                            <th className="pb-2 font-medium">Median</th>
-                            <th className="pb-2 font-medium">Min</th>
-                            <th className="pb-2 font-medium">Vacancy</th>
-                            <th className="pb-2 font-medium">Opening</th>
-                            <th className="pb-2 font-medium">Enrolled</th>
-                            <th className="pb-2 font-medium">Post-Process</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredPriorRows.map((row, index) => (
-                            <tr
-                              key={`${createHistoryRowId(row)}-${index}`}
-                              className="rounded-lg bg-muted/40"
-                            >
-                              <td className="rounded-l-lg px-3 py-3 font-medium">
-                                {row.term}
-                              </td>
-                              <td className="px-3 py-3">{row.section}</td>
-                              <td className="px-3 py-3 font-medium">
-                                {row.bidding_window}
-                              </td>
-                              <td className="px-3 py-3">
-                                ${formatMoney(row.median_bid)}
-                              </td>
-                              <td className="px-3 py-3">
-                                ${formatMoney(row.min_bid)}
-                              </td>
-                              <td className="px-3 py-3">
-                                {formatCount(row.vacancy)}
-                              </td>
-                              <td className="px-3 py-3">
-                                {formatCount(row.opening_vacancy)}
-                              </td>
-                              <td className="px-3 py-3">
-                                {formatCount(row.enrolled_students)}
-                              </td>
-                              <td className="rounded-r-lg px-3 py-3">
-                                {formatCount(row.after_process_vacancy)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                  {priorRows.length
-                    ? "No earlier rows match the current filters."
-                    : "No earlier history is available for this course before the selected target term."}
-                </div>
-              )}
-            </div>
-
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
                 <p className="text-sm font-medium text-muted-foreground">
@@ -1156,6 +992,170 @@ export default function BidSimulationPage() {
                   </a>
                 </div>
               </div>
+            </div>
+
+        {status === "ready" && targetRow ? (
+          <>
+            <div className="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Prior historical context
+                  </p>
+                  <p className="text-lg font-semibold">
+                    Earlier results for {targetRow.course_code} before{" "}
+                    {targetRow.term}
+                  </p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Showing {filteredPriorRows.length} earlier row
+                  {filteredPriorRows.length === 1 ? "" : "s"}
+                  {hasActiveFilters ? ` of ${priorRows.length}` : ""}
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Term</span>
+                    <select
+                      value={termFilter}
+                      onChange={(event) => setTermFilter(event.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="all">All terms</option>
+                      {termOptions.map((term) => (
+                        <option key={term} value={term}>
+                          {term}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Section</span>
+                    <select
+                      value={sectionFilter}
+                      onChange={(event) => setSectionFilter(event.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="all">All sections</option>
+                      {sectionOptions.map((section) => (
+                        <option key={section} value={section}>
+                          {section}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Bidding Window</span>
+                    <select
+                      value={biddingWindowFilter}
+                      onChange={(event) =>
+                        setBiddingWindowFilter(event.target.value)
+                      }
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="all">All bidding windows</option>
+                      {biddingWindowOptions.map((biddingWindow) => (
+                        <option key={biddingWindow} value={biddingWindow}>
+                          {biddingWindow}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setTermFilter("all");
+                        setSectionFilter("all");
+                        setBiddingWindowFilter("all");
+                      }}
+                      disabled={!hasActiveFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {filteredPriorRows.length ? (
+                <>
+                  <TrendChart data={filteredTermTrendRows} />
+                    <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => setIsHistoryCollapsed((current) => !current)}
+                    >
+                    {isHistoryCollapsed ? <ChevronDown /> : <ChevronUp />}
+                    {isHistoryCollapsed ? "Show prior results" : "Hide prior results"}
+                    </Button>
+
+                  {!isHistoryCollapsed ? (
+                    <div className="mt-4 overflow-x-auto">
+                      <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-left text-sm">
+                        <thead>
+                          <tr className="text-muted-foreground">
+                            <th className="pb-2 font-medium">Term</th>
+                            <th className="pb-2 font-medium">Section</th>
+                            <th className="pb-2 font-medium">Bidding Window</th>
+                            <th className="pb-2 font-medium">Median</th>
+                            <th className="pb-2 font-medium">Min</th>
+                            <th className="pb-2 font-medium">Vacancy</th>
+                            <th className="pb-2 font-medium">Opening</th>
+                            <th className="pb-2 font-medium">Enrolled</th>
+                            <th className="pb-2 font-medium">Post-Process</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredPriorRows.map((row, index) => (
+                            <tr
+                              key={`${createHistoryRowId(row)}-${index}`}
+                              className="rounded-lg bg-muted/40"
+                            >
+                              <td className="rounded-l-lg px-3 py-3 font-medium">
+                                {row.term}
+                              </td>
+                              <td className="px-3 py-3">{row.section}</td>
+                              <td className="px-3 py-3 font-medium">
+                                {row.bidding_window}
+                              </td>
+                              <td className="px-3 py-3">
+                                ${formatMoney(row.median_bid)}
+                              </td>
+                              <td className="px-3 py-3">
+                                ${formatMoney(row.min_bid)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {formatCount(row.vacancy)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {formatCount(row.opening_vacancy)}
+                              </td>
+                              <td className="px-3 py-3">
+                                {formatCount(row.enrolled_students)}
+                              </td>
+                              <td className="rounded-r-lg px-3 py-3">
+                                {formatCount(row.after_process_vacancy)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                  {priorRows.length
+                    ? "No earlier rows match the current filters."
+                    : "No earlier history is available for this course before the selected target term."}
+                </div>
+              )}
             </div>
           </>
         ) : null}
