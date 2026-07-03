@@ -107,25 +107,123 @@ function hasMeaningfulBidValue(row) {
   return hasMedianValue || hasPositiveMinValue;
 }
 
-function isBeforeTargetTerm(row, targetRow) {
-  return (
-    row.term.localeCompare(targetRow.term, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    }) < 0
-  );
+function isBeforeTargetRow(row, targetRow) {
+  return compareBiddingRows(row, targetRow) < 0;
 }
 
-function buildTermTrendData(rows) {
+function getHistoryBucketKey(row) {
+  return [row.term, row.bidding_window, row.session_bidding_window].join("|");
+}
+
+function getHistoryBucketLabel(row) {
+  const sessionLabel = row.session_bidding_window
+    ? ` ${row.session_bidding_window}`
+    : "";
+
+  return `${row.term} ${row.bidding_window}${sessionLabel}`;
+}
+
+function extractTermCode(term) {
+  if (!term) {
+    return "N/A";
+  }
+
+  return term.replace(" Term ", " T");
+}
+
+function extractRoundWindowCodes(text) {
+  if (!text) {
+    return { roundCode: null, windowCode: null };
+  }
+
+  const roundMatch = text.match(/(?:Round|Rnd)\s*([A-Za-z0-9]+)/i);
+  const windowMatch = text.match(/(?:Window|Win)\s*([A-Za-z0-9]+)/i);
+
+  return {
+    roundCode: roundMatch?.[1] ? `R${roundMatch[1].toUpperCase()}` : null,
+    windowCode: windowMatch?.[1] ? `W${windowMatch[1].toUpperCase()}` : null,
+  };
+}
+
+function extractWindowTypeCode(text) {
+  if (!text) {
+    return null;
+  }
+
+  const normalizedText = text.toLowerCase();
+
+  if (normalizedText.includes("incoming exchange")) {
+    return "IE";
+  }
+
+  if (normalizedText.includes("incoming freshmen")) {
+    return "IF";
+  }
+
+  if (normalizedText.includes("freshmen")) {
+    return "FR";
+  }
+
+  if (normalizedText.includes("exchange")) {
+    return "EX";
+  }
+
+  if (normalizedText.includes("withdraw")) {
+    return "WD";
+  }
+
+  if (normalizedText.includes("regular")) {
+    return "REG";
+  }
+
+  return null;
+}
+
+function buildAxisLabel(row) {
+  const termCode = extractTermCode(row.term);
+  const biddingCodes = extractRoundWindowCodes(row.bidding_window);
+  const sessionCodes = extractRoundWindowCodes(row.session_bidding_window);
+  const roundCode = biddingCodes.roundCode ?? sessionCodes.roundCode;
+  const windowCode = biddingCodes.windowCode ?? sessionCodes.windowCode;
+  const hasExplicitRoundWindow = Boolean(roundCode || windowCode);
+  const windowTypeCode =
+    hasExplicitRoundWindow
+      ? extractWindowTypeCode(row.bidding_window)
+      : extractWindowTypeCode(row.bidding_window) ??
+        extractWindowTypeCode(row.session_bidding_window);
+  const parts = [termCode];
+
+  if (windowTypeCode) {
+    parts.push(windowTypeCode);
+  }
+
+  if (roundCode) {
+    parts.push(roundCode);
+  }
+
+  if (windowCode) {
+    parts.push(windowCode);
+  }
+
+  if (!windowTypeCode && !roundCode && !windowCode) {
+    parts.push("BW");
+  }
+
+  return parts.join(" ");
+}
+
+function buildHistoryTrendData(rows) {
   const termGroups = rows.reduce((groups, row) => {
-    const currentGroup = groups.get(row.term) ?? [];
+    const bucketKey = getHistoryBucketKey(row);
+    const currentGroup = groups.get(bucketKey) ?? [];
     currentGroup.push(row);
-    groups.set(row.term, currentGroup);
+    groups.set(bucketKey, currentGroup);
     return groups;
   }, new Map());
 
-  return [...termGroups.entries()].map(([term, termRows]) => {
+  return [...termGroups.entries()].map(([bucketKey, termRows]) => {
     const meaningfulRows = termRows.filter(hasMeaningfulBidValue);
+    const representativeRow = termRows[0];
 
     const medianValues = meaningfulRows
       .map((row) => row.median_bid)
@@ -140,11 +238,25 @@ function buildTermTrendData(rows) {
       .filter((value) => !Number.isNaN(value) && value > 0);
 
     return {
-      term,
+      key: bucketKey,
+      fullLabel: representativeRow
+        ? getHistoryBucketLabel(representativeRow)
+        : bucketKey,
+      axisLabel: representativeRow ? buildAxisLabel(representativeRow) : bucketKey,
       medianValue: getMedian(medianValues),
       minValue: minValues.length ? Math.min(...minValues) : null,
     };
   });
+}
+
+function getUniqueSortedValues(rows, key) {
+  return [...new Set(rows.map((row) => row[key]).filter(Boolean))].sort(
+    (left, right) =>
+      left.localeCompare(right, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+  );
 }
 
 function getNumericBidValue(value) {
@@ -193,12 +305,12 @@ function buildSimulationData(rows) {
     return null;
   }
 
-  const priorRows = sortedRows.filter((row) => isBeforeTargetTerm(row, targetRow));
+  const priorRows = sortedRows.filter((row) => isBeforeTargetRow(row, targetRow));
 
   return {
     targetRow,
     priorRows,
-    termTrendRows: buildTermTrendData(priorRows),
+    termTrendRows: buildHistoryTrendData(priorRows),
   };
 }
 
@@ -228,9 +340,17 @@ function createHistoryRowId(row) {
 }
 
 function TrendChart({ data }) {
-  const chartWidth = 720;
+  const longestAxisLabelLength = Math.max(
+    ...data.map((item) => item.axisLabel?.length ?? 0),
+    0
+  );
+  const minPointSpacing = Math.max(112, longestAxisLabelLength * 8);
+  const chartWidth = Math.max(
+    720,
+    52 + 24 + Math.max(data.length - 1, 1) * minPointSpacing
+  );
   const chartHeight = 260;
-  const padding = { top: 20, right: 24, bottom: 44, left: 52 };
+  const padding = { top: 20, right: 24, bottom: 52, left: 52 };
   const drawableWidth = chartWidth - padding.left - padding.right;
   const drawableHeight = chartHeight - padding.top - padding.bottom;
   const allValues = data.flatMap((item) =>
@@ -309,9 +429,10 @@ function TrendChart({ data }) {
       <div className="mt-4 overflow-x-auto">
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="h-[260px] min-w-[720px] w-full"
+          className="h-[260px]"
+          style={{ width: `${chartWidth}px`, minWidth: `${chartWidth}px` }}
           role="img"
-          aria-label="Median and minimum resulting bid trend by prior term"
+          aria-label="Median and minimum resulting bid trend by prior bidding window"
         >
           {yTicks.map((tick) => (
             <g key={tick.y}>
@@ -358,12 +479,12 @@ function TrendChart({ data }) {
             const x = getX(index);
 
             return (
-              <g key={item.term}>
+              <g key={item.key}>
                 {item.medianValue !== null ? (
                   <circle
                     cx={x}
                     cy={getY(item.medianValue)}
-                    r="4"
+                    r="3.5"
                     className="fill-foreground"
                   />
                 ) : null}
@@ -372,7 +493,7 @@ function TrendChart({ data }) {
                   <circle
                     cx={x}
                     cy={getY(item.minValue)}
-                    r="4"
+                    r="3.5"
                     className="fill-muted-foreground"
                   />
                 ) : null}
@@ -383,13 +504,22 @@ function TrendChart({ data }) {
                   textAnchor="middle"
                   className="fill-muted-foreground text-[11px]"
                 >
-                  {item.term}
+                  {item.axisLabel}
                 </text>
+
+                <title>{item.fullLabel}</title>
               </g>
             );
           })}
         </svg>
       </div>
+
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+        Each point represents one prior bidding-window bucket in this filtered
+        history. The black line shows the median of all recorded median bids in
+        that bucket, and the gray line shows the lowest recorded minimum bid in
+        that bucket.
+      </p>
     </div>
   );
 }
@@ -494,6 +624,9 @@ export default function BidSimulationPage() {
   const [rerollToken, setRerollToken] = useState(0);
   const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
   const [hasSubmittedBid, setHasSubmittedBid] = useState(false);
+  const [termFilter, setTermFilter] = useState("all");
+  const [sectionFilter, setSectionFilter] = useState("all");
+  const [biddingWindowFilter, setBiddingWindowFilter] = useState("all");
 
   useEffect(() => {
     let isActive = true;
@@ -588,6 +721,9 @@ export default function BidSimulationPage() {
       setBidAmount("");
       setHasSubmittedBid(false);
       setIsHistoryCollapsed(false);
+      setTermFilter("all");
+      setSectionFilter("all");
+      setBiddingWindowFilter("all");
       setStatus("ready");
     }
 
@@ -600,12 +736,53 @@ export default function BidSimulationPage() {
 
   const targetRow = simulationData?.targetRow;
   const priorRows = simulationData?.priorRows ?? [];
-  const termTrendRows = simulationData?.termTrendRows ?? [];
   const schedule = simulationData?.sectionInfo?.schedule ?? "TBA";
   const courseAreas = simulationData?.sectionInfo?.course_areas ?? "";
   const courseAreasPreview = courseAreas
     ? courseAreas.split("|").slice(0, 3).join(" | ")
     : "No course areas available.";
+  const termOptions = useMemo(
+    () => getUniqueSortedValues(priorRows, "term"),
+    [priorRows]
+  );
+  const sectionOptions = useMemo(
+    () => getUniqueSortedValues(priorRows, "section"),
+    [priorRows]
+  );
+  const biddingWindowOptions = useMemo(
+    () => getUniqueSortedValues(priorRows, "bidding_window"),
+    [priorRows]
+  );
+  const filteredPriorRows = useMemo(
+    () =>
+      priorRows.filter((row) => {
+        if (termFilter !== "all" && row.term !== termFilter) {
+          return false;
+        }
+
+        if (sectionFilter !== "all" && row.section !== sectionFilter) {
+          return false;
+        }
+
+        if (
+          biddingWindowFilter !== "all" &&
+          row.bidding_window !== biddingWindowFilter
+        ) {
+          return false;
+        }
+
+        return true;
+      }),
+    [biddingWindowFilter, priorRows, sectionFilter, termFilter]
+  );
+  const filteredTermTrendRows = useMemo(
+    () => buildHistoryTrendData(filteredPriorRows),
+    [filteredPriorRows]
+  );
+  const hasActiveFilters =
+    termFilter !== "all" ||
+    sectionFilter !== "all" ||
+    biddingWindowFilter !== "all";
 
   const numericBidAmount = useMemo(() => {
     if (bidAmount.trim() === "") {
@@ -729,12 +906,79 @@ export default function BidSimulationPage() {
                   </p>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Showing {priorRows.length} earlier row
-                  {priorRows.length === 1 ? "" : "s"}
+                  Showing {filteredPriorRows.length} earlier row
+                  {filteredPriorRows.length === 1 ? "" : "s"}
+                  {hasActiveFilters ? ` of ${priorRows.length}` : ""}
                 </p>
               </div>
 
-              <div className="mt-4 flex justify-start">
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Term</span>
+                    <select
+                      value={termFilter}
+                      onChange={(event) => setTermFilter(event.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="all">All terms</option>
+                      {termOptions.map((term) => (
+                        <option key={term} value={term}>
+                          {term}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Section</span>
+                    <select
+                      value={sectionFilter}
+                      onChange={(event) => setSectionFilter(event.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="all">All sections</option>
+                      {sectionOptions.map((section) => (
+                        <option key={section} value={section}>
+                          {section}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-muted-foreground">Bidding Window</span>
+                    <select
+                      value={biddingWindowFilter}
+                      onChange={(event) =>
+                        setBiddingWindowFilter(event.target.value)
+                      }
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="all">All bidding windows</option>
+                      {biddingWindowOptions.map((biddingWindow) => (
+                        <option key={biddingWindow} value={biddingWindow}>
+                          {biddingWindow}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setTermFilter("all");
+                        setSectionFilter("all");
+                        setBiddingWindowFilter("all");
+                      }}
+                      disabled={!hasActiveFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                </div>
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -745,9 +989,9 @@ export default function BidSimulationPage() {
                 </Button>
               </div>
 
-              {priorRows.length ? (
+              {filteredPriorRows.length ? (
                 <>
-                  <TrendChart data={termTrendRows} />
+                  <TrendChart data={filteredTermTrendRows} />
 
                   {!isHistoryCollapsed ? (
                     <div className="mt-4 overflow-x-auto">
@@ -766,7 +1010,7 @@ export default function BidSimulationPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {priorRows.map((row, index) => (
+                          {filteredPriorRows.map((row, index) => (
                             <tr
                               key={`${createHistoryRowId(row)}-${index}`}
                               className="rounded-lg bg-muted/40"
@@ -805,8 +1049,9 @@ export default function BidSimulationPage() {
                 </>
               ) : (
                 <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                  No earlier history is available for this course before the
-                  selected target term.
+                  {priorRows.length
+                    ? "No earlier rows match the current filters."
+                    : "No earlier history is available for this course before the selected target term."}
                 </div>
               )}
             </div>
