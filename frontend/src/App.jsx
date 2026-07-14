@@ -5,6 +5,7 @@ import AuthPage from "./pages/AuthPage";
 import TrainingPage from "./pages/TrainingPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import ProgressPage from "./pages/ProgressPage";
+import SearchPage from "./pages/SearchPage";
 import "./App.css";
 
 function RequireAuth({ children }) {
@@ -22,6 +23,7 @@ function Layout({ children }) {
         <nav className="navbar">
           <span className="brand">BidSight</span>
           <NavLink to="/training">Training</NavLink>
+          <NavLink to="/search">Search</NavLink>
           <NavLink to="/progress">Progress</NavLink>
           <NavLink to="/leaderboard">Leaderboard</NavLink>
           <button className="link-button" onClick={() => supabase.auth.signOut()}>
@@ -49,6 +51,14 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <TrainingPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/search"
+          element={
+            <RequireAuth>
+              <SearchPage />
             </RequireAuth>
           }
         />

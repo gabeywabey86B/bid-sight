@@ -35,4 +35,5 @@ export const api = {
     request("/predictions", { method: "POST", body: prediction }),
   myPredictions: () => request("/predictions/me"),
   leaderboard: (limit = 20) => request(`/leaderboard?limit=${limit}`),
+  searchCourses: (q) => request(`/courses/search?q=${encodeURIComponent(q)}`),
 };

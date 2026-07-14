@@ -1,21 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-
-// "Day: Tue, start time: 15:30,end time : 17:00|Day: Thu, start time: 15:30,end time : 17:00"
-// -> { day: "Tue, Thu", timing: "15:30-17:00, 15:30-17:00" }
-function parseSchedule(schedule) {
-  if (!schedule) return { day: "", timing: "" };
-  const slots = schedule.split("|").map((slot) => {
-    const day = slot.match(/Day:\s*([^,]+)/)?.[1]?.trim() ?? "";
-    const start = slot.match(/start time:\s*([\d:]+)/)?.[1] ?? "";
-    const end = slot.match(/end time\s*:\s*([\d:]+)/)?.[1] ?? "";
-    return { day, timing: start && end ? `${start}-${end}` : "" };
-  });
-  return {
-    day: slots.map((s) => s.day).join(", "),
-    timing: slots.map((s) => s.timing).join(", "),
-  };
-}
+import { parseSchedule } from "../lib/schedule";
+import MultiSelectFilter from "../components/MultiSelectFilter";
 
 // Columns with a multi-select filter in the header.
 const FILTER_COLUMNS = [
@@ -38,57 +24,6 @@ const SORT_COLUMNS = [
 const HISTORY_COLUMNS = [...FILTER_COLUMNS, ...SORT_COLUMNS];
 
 const NUMERIC_COLUMNS = new Set(["vacancy", "opening_vacancy", "median_bid", "min_bid"]);
-
-function MultiSelectFilter({ label, options, selected, onChange }) {
-  const summary = selected.length === 0 ? "All" : `${selected.length} selected`;
-  const detailsRef = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (detailsRef.current && !detailsRef.current.contains(e.target)) {
-        detailsRef.current.open = false;
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  function toggle(value) {
-    onChange(
-      selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]
-    );
-  }
-
-  return (
-    <details className="multiselect" ref={detailsRef}>
-      <summary>{summary}</summary>
-      <div className="multiselect-menu">
-        <div className="multiselect-actions">
-          <button type="button" className="link-button" onClick={() => onChange([])}>
-            Clear
-          </button>
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => (detailsRef.current.open = false)}
-          >
-            Done
-          </button>
-        </div>
-        {options.map((value) => (
-          <label key={value}>
-            <input
-              type="checkbox"
-              checked={selected.includes(value)}
-              onChange={() => toggle(value)}
-            />
-            {value}
-          </label>
-        ))}
-      </div>
-    </details>
-  );
-}
 
 export default function TrainingPage() {
   const [target, setTarget] = useState("median");
@@ -321,10 +256,9 @@ export default function TrainingPage() {
                     ))}
                   </tr>
                   <tr className="filter-row">
-                    {FILTER_COLUMNS.map(({ key, label }) => (
+                    {FILTER_COLUMNS.map(({ key }) => (
                       <th key={key}>
                         <MultiSelectFilter
-                          label={label}
                           options={columnOptions[key]}
                           selected={columnFilters[key] ?? []}
                           onChange={(values) => setColumnFilter(key, values)}

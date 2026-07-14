@@ -200,8 +200,21 @@ button {
   gap: 12px;
 }
 
+.search-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.search-form input {
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+}
+
 .auth-form input,
-.guess-form input {
+.guess-form input,
+.search-form input {
   padding: 11px 14px;
   border-radius: var(--radius-sm);
   border: none;
@@ -214,12 +227,14 @@ button {
 }
 
 .auth-form input::placeholder,
-.guess-form input::placeholder {
+.guess-form input::placeholder,
+.search-form input::placeholder {
   color: var(--muted);
 }
 
 .auth-form input:focus,
-.guess-form input:focus {
+.guess-form input:focus,
+.search-form input:focus {
   outline: none;
   background: var(--bg);
   box-shadow: 0 0 0 2px var(--primary);
