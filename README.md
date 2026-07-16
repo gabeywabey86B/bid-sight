@@ -100,40 +100,144 @@ After reveal, a user could naively re-submit the exact answer for a perfect 1.0�
 
 ---
 
-## Running Locally
+## Local Setup & Deployment
 
-### Backend
+### Prerequisites
+- **Python 3.9+** (`python --version`)
+- **Node.js 18+** (`node --version`)
+- **Supabase project** with credentials (URL, service role key, anon key)
+- **Git** repository access
+
+### Step 1: Clone & Install Dependencies
+
 ```bash
+# Clone the repository
+git clone https://github.com/gabeywabey86B/bid-sight.git
+cd bid-sight
+
+# Install backend dependencies
 cd backend
 pip install -r requirements.txt
-export SUPABASE_URL=<your-project-url>
-export SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
-export FRONTEND_ORIGIN=http://localhost:5173
-uvicorn app.main:app --reload
-# Swagger UI at http://localhost:8000/docs
+
+# Install frontend dependencies
+cd ../frontend
+npm install
+
+# Return to repo root
+cd ..
 ```
 
-### Frontend
+### Step 2: Supabase Migrations (One-time setup)
+
+Go to **Supabase Dashboard → SQL Editor** and run these migrations in order (each in its own query):
+
+#### Migration 001: Leaderboard Schema
+1. Copy and paste the entire contents of `backend/sql/001_leaderboard.sql`
+2. Click **Run** — this adds the `course_code`, `counted` columns and creates the base leaderboard RPCs
+
+#### Migration 002: Score Rescale & School Tabs (Recent update)
+1. Copy and paste the entire contents of `backend/sql/002_score_rescale_school_leaderboards.sql`
+2. Click **Run** — this rescales all scores to 0–1.0, adds `school_department`, and updates RPCs with school filtering
+3. Verify by running:
+   ```sql
+   select min(score), max(score) from predictions where score is not null;
+   -- Should show: min=0.0XX, max=0.9XX (all within [0, 1])
+   
+   select count(*) from predictions where course_code is not null and school_department is null;
+   -- Should show: 0 (or only orphaned rows with no matching course)
+   ```
+
+### Step 3: Environment Setup
+
+Create `.env` or set environment variables:
+
+#### Backend (`backend/`)
+```bash
+export SUPABASE_URL=https://your-project.supabase.co
+export SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # Service Role Key from Supabase
+export FRONTEND_ORIGIN=http://localhost:5173
+export SCORING_K=5.0  # Optional: tuning knob for score curve
+```
+
+On Windows (PowerShell):
+```powershell
+$env:SUPABASE_URL = "https://your-project.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY = "eyJhbGc..."
+$env:FRONTEND_ORIGIN = "http://localhost:5173"
+```
+
+#### Frontend (`frontend/`)
+```bash
+export VITE_API_URL=http://localhost:8000
+export VITE_SUPABASE_URL=https://your-project.supabase.co
+export VITE_SUPABASE_ANON_KEY=eyJhbGc...  # Anon Key from Supabase
+```
+
+On Windows:
+```powershell
+$env:VITE_API_URL = "http://localhost:8000"
+$env:VITE_SUPABASE_URL = "https://your-project.supabase.co"
+$env:VITE_SUPABASE_ANON_KEY = "eyJhbGc..."
+```
+
+### Step 4: Run Backend
+
+```bash
+cd backend
+uvicorn app.main:app --reload
+```
+
+**Output:** `INFO: Application startup complete` at `http://localhost:8000`  
+**API Docs:** Visit `http://localhost:8000/docs` (Swagger UI)
+
+### Step 5: Run Frontend
+
+In a new terminal:
+
 ```bash
 cd frontend
-npm install
-export VITE_API_URL=http://localhost:8000
 npm run dev
-# App at http://localhost:5173
 ```
 
-### First Run: Set up Supabase Schema
-1. In the Supabase SQL editor, run `backend/sql/001_leaderboard.sql` (adds `course_code` + `counted` columns, creates RPCs)
-2. Then run `backend/sql/002_score_rescale_school_leaderboards.sql` (rescales scores to 0–1, adds `school_department`, adds `p_school` to the RPCs)
-3. Seed data or upload CSV via `data_ingestion/` scripts
+**Output:** `Local: http://localhost:5173/`  
+**Open:** http://localhost:5173 in your browser
 
-### Verification
-1. **Backfill check:** After running the SQL, verify `course_code` and `school_department` are populated, all scores are within \[0, 1\], and exactly one `counted` row exists per user/course/target (no duplicates). Re-running 002's score backfill should update 0 rows (idempotent).
-2. **Submission behavior:** Submit a prediction → `counted: true`, reveal shows `0.xx / 1.0`; resubmit same course → `counted: false`; different course → `counted: true`
-3. **Live leaderboard:** Run both frontend + backend; open in two browsers with different accounts; one player submits → other's leaderboard updates within ~15s without a reload
-4. **Board membership:** Verify all-time board requires ≥10 counted predictions, weekly ≥3, and weekly actually resets Monday 00:00 SGT
-5. **School tabs:** `GET /leaderboard?school=SCIS` returns only SCIS rows; a user with 5–9 counted SCIS predictions appears on the SCIS tab but not on All; switching tabs refetches immediately
-6. **UI details:** Replay badge appears when `counted === false`, own row highlights, top scores tie-break by error % then timestamp
+### Step 6: Test the Full Flow
+
+1. **Sign up** with Supabase Auth (email/password or OAuth)
+2. **Train Mode:** Click "Get a section", enter a guess (numeric), click Submit
+3. **Reveal:** Check that score displays as `0.XX / 1.0` (e.g. `0.92 / 1.0`)
+4. **Replay:** Guess the same course again — it should show "Replay — practice only" badge
+5. **Leaderboard:** Click "Leaderboard" tab, verify:
+   - "All" board shows all players (≥10 counted predictions)
+   - School tabs (SCIS, SOE, etc.) appear and filter correctly
+   - Switching tabs updates immediately
+6. **Live polling:** Open leaderboard in two browser windows, submit a prediction in one, watch the other update within 15s
+
+### Verification Checklist
+
+After first run:
+- [ ] Backend starts without errors (check `/health`)
+- [ ] Frontend connects (check browser console for no CORS errors)
+- [ ] Can sign up / log in
+- [ ] Training round loads with hidden answer
+- [ ] Submit prediction → reveal shows score `0.XX / 1.0` and `≤ 0.7` displays as red
+- [ ] Leaderboard has all three boards (all-time, weekly, top scores)
+- [ ] Leaderboard has school tabs; switching tabs refetches
+- [ ] Own row on leaderboard highlights
+- [ ] Replay badge appears on second submission for same course
+- [ ] Progress page shows rolling average and sparkline
+
+### Troubleshooting
+
+| Issue | Solution |
+| :---- | :---- |
+| `SUPABASE_URL not set` | Check env vars: `echo $SUPABASE_URL` (or `$env:SUPABASE_URL` on Windows) |
+| `CORS error in browser console` | Verify `FRONTEND_ORIGIN` matches the frontend URL (http://localhost:5173 for local dev) |
+| `401 Unauthorized` on `/leaderboard` | Supabase Auth JWT is missing; reload page and sign in again |
+| `PostgreSQL function not found` | Run migration 001 and 002 in Supabase SQL editor (check for errors) |
+| `Scores show as 100.00 / 100` | Migration 002 hasn't been run yet; existing rows use old 0–100 scale |
+| `School tabs don't filter` | Backend may be old code; restart with `uvicorn --reload` |
 
 ---
 
