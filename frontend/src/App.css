@@ -144,6 +144,10 @@ button {
   background: var(--primary);
 }
 
+.school-tabs {
+  flex-wrap: wrap;
+}
+
 .school-filter {
   display: flex;
   align-items: center;
@@ -446,6 +450,22 @@ button {
 
 .reveal button {
   margin-top: 10px;
+}
+
+.badge-muted {
+  display: inline-block;
+  background: var(--surface-raised);
+  color: var(--muted);
+  border-radius: var(--radius-pill);
+  padding: 3px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+/* ---------- Leaderboard page ---------- */
+
+.leaderboard-page tr.own-row td {
+  background: oklch(0.55 0.17 254 / 0.08);
 }
 
 /* ---------- Progress page ---------- */

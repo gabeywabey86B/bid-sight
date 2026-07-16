@@ -34,5 +34,6 @@ export const api = {
   submitPrediction: (prediction) =>
     request("/predictions", { method: "POST", body: prediction }),
   myPredictions: () => request("/predictions/me"),
-  leaderboard: (limit = 20) => request(`/leaderboard?limit=${limit}`),
+  leaderboard: (limit = 20, school = null) =>
+    request(`/leaderboard?limit=${limit}${school ? `&school=${encodeURIComponent(school)}` : ""}`),
 };

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { useApi } from "../lib/useApi";
 
 // "Day: Tue, start time: 15:30,end time : 17:00|Day: Thu, start time: 15:30,end time : 17:00"
 // -> { day: "Tue, Thu", timing: "15:30-17:00, 15:30-17:00" }
@@ -92,7 +93,8 @@ function MultiSelectFilter({ label, options, selected, onChange }) {
 
 export default function TrainingPage() {
   const [target, setTarget] = useState("median");
-  const [schools, setSchools] = useState([]);
+  const { data: schoolsData } = useApi(api.getSchools);
+  const schools = schoolsData?.schools ?? [];
   const [school, setSchool] = useState("");
   const [round, setRound] = useState(null);
   const [history, setHistory] = useState(null);
@@ -102,13 +104,6 @@ export default function TrainingPage() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    api
-      .getSchools()
-      .then((data) => setSchools(data.schools))
-      .catch(() => setSchools([]));
-  }, []);
 
   const rows = useMemo(() => {
     if (!history) return [];
@@ -384,9 +379,14 @@ export default function TrainingPage() {
               <p>
                 Error: <strong>{(result.error_pct * 100).toFixed(1)}%</strong>
               </p>
-              <p className={`score ${result.score >= 70 ? "" : "low"}`}>
-                {result.score.toFixed(1)} / 100
+              <p className={`score ${result.score >= 0.7 ? "" : "low"}`}>
+                {result.score.toFixed(2)} / 1.0
               </p>
+              {result.counted === false && (
+                <p className="badge-muted">
+                  Replay — practice only, doesn't count toward the leaderboard
+                </p>
+              )}
               <button className="btn-ghost" onClick={() => loadRound()}>
                 Next section
               </button>
