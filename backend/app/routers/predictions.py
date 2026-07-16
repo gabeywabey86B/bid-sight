@@ -9,6 +9,8 @@ once BOSS publishes results.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -16,6 +18,8 @@ from ..auth import current_user_id
 from ..config import get_settings
 from ..scoring import score_prediction
 from ..supabase_client import get_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -30,6 +34,18 @@ class PredictionIn(BaseModel):
 
 @router.post("")
 def submit_prediction(body: PredictionIn, user_id: str = Depends(current_user_id)):
+    # Layer 4: Debug Instrumentation — log before any irreversible operation
+    logger.debug(
+        "submit_prediction called",
+        extra={
+            "user_id": user_id,
+            "course_id": body.course_id,
+            "target": body.target,
+            "mode": body.mode,
+            "predicted_value": body.predicted_value,
+        },
+    )
+
     sb = get_client()
     col = "median_bid" if body.target == "median" else "min_bid"
 
@@ -59,6 +75,14 @@ def submit_prediction(body: PredictionIn, user_id: str = Depends(current_user_id
             .data
         )
         if not truth or truth[0][col] in (None, 0):
+            logger.warning(
+                "Section has no eligible outcome",
+                extra={
+                    "course_id": body.course_id,
+                    "column": col,
+                    "truth": truth,
+                },
+            )
             raise HTTPException(status_code=404, detail="Section has no eligible outcome")
         actual = float(truth[0][col])
         result = score_prediction(body.predicted_value, actual, k=get_settings().SCORING_K)

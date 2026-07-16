@@ -7,6 +7,7 @@ min_bid so the reveal only happens after they submit (see predictions.py).
 """
 from __future__ import annotations
 
+import logging
 import random
 
 from fastapi import APIRouter, HTTPException, Query
@@ -14,9 +15,12 @@ from fastapi import APIRouter, HTTPException, Query
 from ..supabase_client import get_client
 
 router = APIRouter(prefix="/training", tags=["training"])
+logger = logging.getLogger(__name__)
 
 # Content pool: Round 1 windows with a real (contested) median.
+# Filter to recent terms (2024-25 onwards) to avoid stale bidding data.
 _WINDOW_FILTER = "%Round 1%"
+_RECENT_TERMS = ["2024-25", "2025-26", "2026-27"]  # Only serve recent academic years
 
 
 @router.get("/schools")
@@ -46,13 +50,24 @@ def get_training_round(
             .gt("median_bid", 0)
             .ilike("bidding_window", _WINDOW_FILTER)
         )
+        # Layer 1: Filter to recent terms only (2025-26 onwards) to avoid stale data
+        if _RECENT_TERMS:
+            q = q.in_("term", _RECENT_TERMS)
+
+        # Layer 2: Ensure school filter is applied if provided
         if school:
             q = q.eq("school_department", school)
         return q
 
     total = base_query("course_id", count="exact").execute().count or 0
     if total == 0:
-        raise HTTPException(status_code=503, detail="No eligible training rounds")
+        # Layer 3: Provide context-aware error messages
+        detail = "No eligible training rounds"
+        if school:
+            detail += f" for {school}"
+        if _RECENT_TERMS:
+            detail += f" in recent terms ({', '.join(_RECENT_TERMS)})"
+        raise HTTPException(status_code=503, detail=detail)
 
     offset = random.randint(0, total - 1)
     row = (

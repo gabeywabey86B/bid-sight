@@ -168,6 +168,16 @@ export default function TrainingPage() {
   const activeFilterCount = Object.values(columnFilters).filter((v) => v && v.length > 0).length;
 
   async function loadRound(nextTarget = target, nextSchool = school) {
+    // Layer 1: Entry Point Validation — reject invalid input immediately
+    if (!nextTarget || !["median", "min"].includes(nextTarget)) {
+      setError("Invalid target: please select Median or Minimum");
+      return;
+    }
+    if (nextSchool && typeof nextSchool !== "string") {
+      setError("Invalid school selection");
+      return;
+    }
+
     setError(null);
     setResult(null);
     setHistory(null);
@@ -177,13 +187,42 @@ export default function TrainingPage() {
     setLoading(true);
     try {
       const data = await api.getTrainingRound(nextTarget, nextSchool || null);
+
+      // Layer 2: Business Logic Validation — check that we got usable data
+      if (!data || !data.course_id) {
+        setError("Invalid response from server: missing course data");
+        return;
+      }
+
       setRound(data);
       api
         .getCourseHistory(data.course_code, data.course_id, data.term)
         .then((h) => setHistory(h.history))
-        .catch(() => setHistory([]));
+        .catch((err) => {
+          console.warn("Failed to load course history:", err);
+          setHistory([]); // Allow the user to continue without history
+        });
     } catch (err) {
-      setError(err.message);
+      // Layer 4: Debug Instrumentation — log detailed error for diagnosis
+      console.error("Failed to load training round", {
+        target: nextTarget,
+        school: nextSchool,
+        error: err.message,
+        stack: err.stack,
+      });
+
+      // Layer 3: Environment Guard — provide context-aware error messages
+      if (err.message.includes("503")) {
+        setError(
+          `No eligible courses available${nextSchool ? ` for ${nextSchool}` : ""}. Try a different school or time back.`
+        );
+      } else if (err.message.includes("401")) {
+        setError("Your session has expired. Please log in again.");
+      } else if (err.message.includes("Network") || err.message.includes("fetch")) {
+        setError("Network error: cannot reach server. Please check your connection.");
+      } else {
+        setError(`Failed to load round: ${err.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -191,7 +230,27 @@ export default function TrainingPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!round || guess === "") return;
+
+    // Layer 1: Entry Point Validation
+    if (!round) {
+      setError("No round loaded. Please click 'Get a section' first.");
+      return;
+    }
+    if (!guess || guess.trim() === "") {
+      setError("Please enter a guess before submitting.");
+      return;
+    }
+
+    const guessNum = Number(guess);
+    if (isNaN(guessNum)) {
+      setError("Guess must be a valid number.");
+      return;
+    }
+    if (guessNum < 0) {
+      setError("Guess cannot be negative.");
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {
@@ -200,11 +259,31 @@ export default function TrainingPage() {
         bidding_window: round.bidding_window,
         target,
         mode: "training",
-        predicted_value: Number(guess),
+        predicted_value: guessNum,
       });
+
+      // Layer 2: Business Logic Validation
+      if (!res || typeof res.score !== "number") {
+        setError("Invalid response from server: missing score");
+        return;
+      }
+
       setResult(res);
     } catch (err) {
-      setError(err.message);
+      console.error("Failed to submit prediction", {
+        courseId: round.course_id,
+        target,
+        guess: guessNum,
+        error: err.message,
+      });
+
+      if (err.message.includes("404")) {
+        setError("This section is no longer available. Please get a new one.");
+      } else if (err.message.includes("401")) {
+        setError("Your session has expired. Please log in again.");
+      } else {
+        setError(`Failed to submit: ${err.message}`);
+      }
     } finally {
       setLoading(false);
     }
