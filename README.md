@@ -4,8 +4,23 @@
 
 ## Status
 
-**Live:** Training Mode, Accounts + Sign-in, Live-updating Leaderboard (all-time, weekly, top scores)  
+**Live:** 
+- ✅ Training Mode with 0-1.0 graded predictions
+- ✅ Accounts + Sign-in (Supabase Auth)
+- ✅ Live-updating Leaderboard (all-time, weekly, top scores, per-school tabs)
+- ✅ Defense-in-depth error handling & multi-layer logging
+- ✅ Per-school leaderboard filtering (SCIS, SOE, LKCSB, YPHSL, SOA, SOSS, CIS, CEC, YPHSL JD)
+- ✅ Score rescaling (0–1.0 inverse curve, K=5)
+
 **In progress:** Accuracy breakdown by course, AI coach, Live Round Mode
+
+**Recent updates (2026-07-17):**
+- Multi-layer validation prevents submission without proper selection
+- Context-aware error messages guide users to correct actions
+- Browser console logging for debugging API calls
+- Backend logging on submission and error points
+- Term filter fix to match actual data format (YYYY-YY Term N)
+- Comprehensive troubleshooting guide
 
 ---
 
@@ -228,16 +243,83 @@ After first run:
 - [ ] Replay badge appears on second submission for same course
 - [ ] Progress page shows rolling average and sparkline
 
-### Troubleshooting
+---
 
-| Issue | Solution |
-| :---- | :---- |
-| `SUPABASE_URL not set` | Check env vars: `echo $SUPABASE_URL` (or `$env:SUPABASE_URL` on Windows) |
-| `CORS error in browser console` | Verify `FRONTEND_ORIGIN` matches the frontend URL (http://localhost:5173 for local dev) |
-| `401 Unauthorized` on `/leaderboard` | Supabase Auth JWT is missing; reload page and sign in again |
-| `PostgreSQL function not found` | Run migration 001 and 002 in Supabase SQL editor (check for errors) |
-| `Scores show as 100.00 / 100` | Migration 002 hasn't been run yet; existing rows use old 0–100 scale |
-| `School tabs don't filter` | Backend may be old code; restart with `uvicorn --reload` |
+## Defense-in-Depth: Error Handling & Validation
+
+The app uses multi-layer validation to make bugs structurally impossible, not just less likely.
+
+### Layer 1: Entry Point Validation
+- **Frontend (TrainingPage.jsx):** Validates inputs before API calls
+  - Target must be "median" or "min"
+  - Guess must be a valid positive number
+  - Course must be loaded before submission
+- **Backend (routers):** Pydantic models validate request schemas and regex patterns
+
+### Layer 2: Business Logic Validation
+- **Frontend:** Checks API responses contain required data (course_id, score)
+- **Backend:** Verifies section has eligible outcome (median_bid > 0)
+- **Database:** Foreign key constraints enforce referential integrity
+
+### Layer 3: Environment Guards
+- **Backend:** Context-aware error messages
+  - "No eligible training rounds in recent terms (2024-25, 2025-26)"
+  - Distinguishes between missing data vs. network errors
+- **Frontend:** Different error messages for 503, 401, network failures
+
+### Layer 4: Debug Instrumentation
+- **Frontend (browser console):** Logs all API calls with URLs, auth status, and errors
+  - `API request {method, url, hasAuth}`
+  - `API error response {status, error}`
+- **Backend (server logs):** Detailed logging at submission and error points
+  - `submit_prediction called {user_id, course_id, target, predicted_value}`
+  - `Section has no eligible outcome {course_id, column, truth}`
+
+### Debugging via Console
+
+Press **F12 → Console** and look for:
+```
+API request {url: 'http://localhost:8000/training/round?target=median', method: 'GET', hasAuth: true}
+API success {url: '...', statusCode: 200}
+```
+
+Or errors like:
+```
+API error response {status: 503, error: '503 {"detail":"No eligible training rounds in recent terms (2024-25, 2025-26)"}'}
+```
+
+---
+
+## Data Format & Term Filtering
+
+**Important:** The `bidding_table_info` table uses the term format `YYYY-YY Term N` (e.g., `2024-25 Term 1`, not just `2024-25`).
+
+Backend filters:
+```python
+_RECENT_TERMS = [
+    "2024-25 Term 1",
+    "2024-25 Term 2",
+    "2025-26 Term 1",
+    "2025-26 Term 2",
+]
+```
+
+This ensures only recent bidding data is served to users. Adjust as new terms become available.
+
+---
+
+## Troubleshooting
+
+| Issue | Cause | Solution |
+| :---- | :---- | :---- |
+| `SUPABASE_URL not set` | Missing env var | Check `.env` file or `$env:SUPABASE_URL` (Windows) |
+| `CORS error in browser console` | Frontend origin mismatch | Verify `FRONTEND_ORIGIN=http://localhost:5173` in backend `.env` |
+| `401 Unauthorized` on `/leaderboard` | Missing/expired auth token | Reload page and sign in again |
+| `No eligible training rounds in recent terms` | No data for those terms or term format mismatch | Check data format in Supabase; adjust `_RECENT_TERMS` if needed |
+| `PostgreSQL function not found` | Migration not run | Run both 001 and 002 migrations in Supabase SQL editor |
+| `Scores show as 100.00 / 100` | Old 0–100 scale | Migration 002 hasn't been run; scores need rescaling |
+| `School tabs don't filter` | Stale backend code | Restart: `uvicorn --reload` |
+| `Leaderboard returns 0 rows` | Low prediction count | User needs ≥10 all-time or ≥3 this week to rank |
 
 ---
 
