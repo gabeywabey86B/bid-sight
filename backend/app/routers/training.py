@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 # Content pool: Round 1 windows with a real (contested) median.
 # Filter to recent terms (2024-25 onwards) to avoid stale bidding data.
 _WINDOW_FILTER = "%Round 1%"
-_RECENT_TERMS = ["2024-25", "2025-26", "2026-27"]  # Only serve recent academic years
+_RECENT_TERMS = [
+    "2024-25 Term 1",
+    "2024-25 Term 2",
+    "2025-26 Term 1",
+    "2025-26 Term 2",
+]  # Only serve recent academic years
 
 
 @router.get("/schools")
