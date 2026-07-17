@@ -12,13 +12,43 @@ async function authHeaders() {
 }
 
 async function request(path, { method = "GET", body } = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const url = `${BASE}${path}`;
+
+  // Layer 4: Debug Instrumentation — log all API calls for diagnosis
+  console.debug("API request", {
     method,
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: body ? JSON.stringify(body) : undefined,
+    url,
+    hasAuth: !!(await supabase.auth.getSession()).data?.session,
   });
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.json();
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    // Layer 2: Business Logic Validation — check response status
+    if (!res.ok) {
+      const errorText = await res.text();
+      const errorMsg = `${res.status} ${errorText}`;
+      console.error("API error response", { status: res.status, url, error: errorMsg });
+      throw new Error(errorMsg);
+    }
+
+    const data = await res.json();
+    console.debug("API success", { url, statusCode: res.status });
+    return data;
+  } catch (err) {
+    // Layer 4: Debug Instrumentation — log network errors
+    console.error("API request failed", {
+      url,
+      method,
+      error: err.message,
+      stack: err.stack,
+    });
+    throw err;
+  }
 }
 
 export const api = {
@@ -34,5 +64,6 @@ export const api = {
   submitPrediction: (prediction) =>
     request("/predictions", { method: "POST", body: prediction }),
   myPredictions: () => request("/predictions/me"),
-  leaderboard: (limit = 20) => request(`/leaderboard?limit=${limit}`),
+  leaderboard: (limit = 20, school = null) =>
+    request(`/leaderboard?limit=${limit}${school ? `&school=${encodeURIComponent(school)}` : ""}`),
 };

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { useApi } from "../lib/useApi";
 
 const WINDOW = 5;
 
@@ -17,7 +18,7 @@ function Sparkline({ points }) {
   const h = 160;
   const pad = 8;
   const xStep = (w - pad * 2) / (points.length - 1);
-  const toY = (score) => h - pad - (score / 100) * (h - pad * 2);
+  const toY = (score) => h - pad - score * (h - pad * 2);
   const trending = points.at(-1).rolling >= points[0].rolling;
 
   const path = points
@@ -26,23 +27,15 @@ function Sparkline({ points }) {
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="sparkline" preserveAspectRatio="none">
-      <line x1={pad} y1={toY(50)} x2={w - pad} y2={toY(50)} className="sparkline-mid" />
+      <line x1={pad} y1={toY(0.5)} x2={w - pad} y2={toY(0.5)} className="sparkline-mid" />
       <path d={path} className={`sparkline-path ${trending ? "" : "down"}`} fill="none" />
     </svg>
   );
 }
 
 export default function ProgressPage() {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
+  const { data, error } = useApi(api.myPredictions);
   const [targetFilter, setTargetFilter] = useState("all");
-
-  useEffect(() => {
-    api
-      .myPredictions()
-      .then(setData)
-      .catch((err) => setError(err.message));
-  }, []);
 
   const chronological = useMemo(() => {
     if (!data) return [];
@@ -109,14 +102,14 @@ export default function ProgressPage() {
               </span>
             </div>
             <div>
-              <span className="big-stat">{latestRolling.toFixed(1)}</span>
+              <span className="big-stat">{latestRolling.toFixed(2)}</span>
               <span className="meta">rolling avg (last {WINDOW})</span>
             </div>
             {trend !== null && (
               <div>
                 <span className={`big-stat ${trend >= 0 ? "trend-up" : "trend-down"}`}>
                   {trend >= 0 ? "+" : ""}
-                  {trend.toFixed(1)}
+                  {trend.toFixed(2)}
                 </span>
                 <span className="meta">change since your first {WINDOW}</span>
               </div>
@@ -144,8 +137,8 @@ export default function ProgressPage() {
                     <td className="num-col">{chronological.length - i}</td>
                     <td>{p.course_id}</td>
                     <td>{p.target}</td>
-                    <td className="num-col">{p.score.toFixed(1)}</td>
-                    <td className="num-col">{p.rolling.toFixed(1)}</td>
+                    <td className="num-col">{p.score.toFixed(2)}</td>
+                    <td className="num-col">{p.rolling.toFixed(2)}</td>
                   </tr>
                 ))}
             </tbody>

@@ -6,17 +6,17 @@ so it lives here and nowhere else (never re-implemented in the client).
 Design (from the design review):
 - Error is measured in PERCENT, not dollars, so a $3 miss on a $12 course is
   penalised harder than a $3 miss on a $60 course (fairer across price levels).
-- The score is an inverse curve: 100 at a perfect guess, decaying toward 0,
+- The score is an inverse curve: 1.0 at a perfect guess, decaying toward 0,
   with the penalty *flattening* as you get further away (a wild miss and a
   slightly-less-wild miss score similarly low, so the top of the leaderboard is
   decided by near-bullseyes, not by who was "least insanely wrong").
 
-    score = 100 / (1 + K * error_pct)
+    score = 1 / (1 + K * error_pct)
 
 K is the sharpness knob. Higher K = steeper penalty near the target.
 K should eventually be *tuned against the real median-bid distribution*
 (Round 1, median > 0). K=5.0 is a sane default:
-    10% off -> 66.7    20% off -> 50.0    50% off -> 28.6    100% off -> 16.7
+    10% off -> 0.667    20% off -> 0.5    50% off -> 0.286    100% off -> 0.167
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def percent_error(predicted: float, actual: float) -> float:
 
 
 def score_prediction(predicted: float, actual: float, k: float = DEFAULT_K) -> dict:
-    """Return the error_pct (0-1) and the 0-100 score for one guess."""
+    """Return the error_pct (0-1) and the 0-1 score for one guess."""
     err = percent_error(predicted, actual)
-    score = 100.0 / (1.0 + k * err)
-    return {"error_pct": round(err, 4), "score": round(score, 2)}
+    score = 1.0 / (1.0 + k * err)
+    return {"error_pct": round(err, 4), "score": round(score, 3)}
