@@ -6,15 +6,24 @@
 
 **Live:** 
 - ✅ Training Mode with 0-1.0 graded predictions
-- ✅ Accounts + Sign-in (Supabase Auth)
-- ✅ Live-updating Leaderboard (all-time, weekly, top scores, per-school tabs)
+- ✅ Accounts + Sign-in (Supabase Auth, email/password **and** Google OAuth)
+- ✅ Duplicate-username protection (case-insensitive unique names, collision-safe signup trigger)
+- ✅ Live-updating Leaderboard (all-time, weekly, top scores, per-school tabs, friends board)
+- ✅ Friends: search, add/remove (one-way instant follow), profile page with editable display name
+- ✅ Bid-history and score-progress charts (Recharts)
+- ✅ LIVE auction rounds: admin-run rounds with real bidding, seat clearing, winner lockout, seat carryover
 - ✅ Defense-in-depth error handling & multi-layer logging
 - ✅ Per-school leaderboard filtering (SCIS, SOE, LKCSB, YPHSL, SOA, SOSS, CIS, CEC, YPHSL JD)
 - ✅ Score rescaling (0–1.0 inverse curve, K=5)
 
-**In progress:** Accuracy breakdown by course, AI coach, Live Round Mode
+**In progress:** Accuracy breakdown by course, AI coach
 
-**Recent updates (2026-07-17):**
+**Recent updates (2026-07-23):**
+- **v2 feature set** (5 phases): Recharts-based charts, Google OAuth + duplicate-username protection, friends leaderboard/profile page, and admin-run LIVE auction rounds (see "LIVE Auction Rounds" and "Auth & Friends" sections below)
+- Migrations 003 (`display_name_unique`), 004 (`friends`), 005 (`live_rounds`) added
+- Logo now links to `/training`; all-time leaderboard capped at top 5 (weekly board unchanged)
+
+**Previous updates (2026-07-17):**
 - Multi-layer validation prevents submission without proper selection
 - Context-aware error messages guide users to correct actions
 - Browser console logging for debugging API calls
@@ -90,8 +99,34 @@ That's it. One screen. One interaction. One immediate feedback loop.
 ### Tier 4: 
 | Feature | What it does | Why it matters | Status |
 | :---- | :---- | :---- | :---- |
-| **Live Round Mode** | Real upcoming BOSS round opens, live predictions, crowd consensus | The full product idea. | **Vision slide only.** Not built. |
+| **Live Round Mode** | Admin-run round opens, users bid once each, top-N seats clear at close with winner lockout + seat carryover | The full product idea. | ✓ Done |
 | **Anonymous data collection** | Users submit grades, internship placements, LOA, exchange info | Broadens the platform. | **Cut entirely.** No ground truth, no enforcement. |
+
+---
+
+## Charts, Auth, Friends & LIVE Rounds (v2)
+
+### Charts (Recharts)
+- **Training page:** `BidHistoryChart` plots the historical median/min bid trend for the course currently being trained on, averaged per term (Median / Min / Both toggle, filterable by section/window). Hidden when fewer than 2 terms of history exist.
+- **Progress page:** `ScoreChart` replaces the old hand-rolled sparkline — fixed 0–1 y-axis, dotted raw-score line + bold rolling-average line, dashed reference line at 0.5, x-axis is attempt number (not date, so dates don't collapse when you play several rounds in one sitting).
+
+### Auth: Google OAuth + duplicate-username protection
+- Sign-up now checks name availability (`GET /profiles/check-name`) before submitting, and shows a "check your email" screen after signup (`emailRedirectTo` set) instead of leaving the user on a blank form.
+- "Continue with Google" calls `supabase.auth.signInWithOAuth({ provider: "google" })` — no backend changes needed, since Google-issued sessions use the same JWT verification as password logins.
+- `profiles.display_name` has a case-insensitive unique index; the signup trigger (`handle_new_user`) is collision-safe — it tries `raw_user_meta_data->>'display_name'` → `'full_name'` → `'name'` (Google) → the email's local-part, appending `-2`, `-3`, ... on conflict.
+- **Manual setup required** (can't be automated): create a Google OAuth Client in Google Cloud Console, enable the Google provider in Supabase Auth with that Client ID/Secret, and add your dev/prod origins to Supabase's redirect URL allowlist.
+
+### Friends
+- `/profile`: view/edit your display name, search for other users, add/remove friends (one-way instant follow — no request/accept step).
+- `/leaderboard`: a Global | Friends toggle above the school tabs; friends board has a lower eligibility bar (1 counted prediction) since friend groups are small.
+
+### LIVE Auction Rounds
+- An **admin** (flagged via `profiles.is_admin`) creates a session and rounds (course, section, seat count) on `/admin`, opens a round, and closes it when ready.
+- Users bid once per round on `/live`. On close, the top-N bids (by amount, ties broken by earlier submission) win the N seats; avg/min/max/median bid are shown to everyone afterward.
+- **Winner lockout:** once you've won a seat for a course+section, you can't bid on a later round for that same course+section within the same session.
+- **Seat carryover:** a new round's seat count is prefilled from `Σ allocated − Σ filled` across that course+section's prior closed rounds (admin can override).
+- No Supabase Realtime — the frontend polls every 5s, and any round past its `ends_at` auto-closes lazily as a side effect of the next request that touches it (no background scheduler needed).
+- To make an account admin: `update profiles set is_admin = true where id = '<uuid from Supabase Dashboard → Auth → Users>';`
 
 ---
 
@@ -150,7 +185,7 @@ Go to **Supabase Dashboard → SQL Editor** and run these migrations in order (e
 1. Copy and paste the entire contents of `backend/sql/001_leaderboard.sql`
 2. Click **Run** — this adds the `course_code`, `counted` columns and creates the base leaderboard RPCs
 
-#### Migration 002: Score Rescale & School Tabs (Recent update)
+#### Migration 002: Score Rescale & School Tabs
 1. Copy and paste the entire contents of `backend/sql/002_score_rescale_school_leaderboards.sql`
 2. Click **Run** — this rescales all scores to 0–1.0, adds `school_department`, and updates RPCs with school filtering
 3. Verify by running:
@@ -161,6 +196,16 @@ Go to **Supabase Dashboard → SQL Editor** and run these migrations in order (e
    select count(*) from predictions where course_code is not null and school_department is null;
    -- Should show: 0 (or only orphaned rows with no matching course)
    ```
+
+#### Migration 003: Duplicate-Username Protection
+1. Run `backend/sql/003_display_name_unique.sql` — dedupes existing duplicate display names, adds a case-insensitive unique index, and replaces the signup trigger with a collision-safe version (also reads Google OAuth's `full_name`/`name` metadata, not just password-signup's `display_name`).
+
+#### Migration 004: Friends
+1. Run `backend/sql/004_friends.sql` — adds the `friends` table and a `p_friends_of` filter param on `training_leaderboard` (drops and recreates the RPC, since Postgres can't just add a parameter to an existing function signature).
+
+#### Migration 005: LIVE Auction Rounds
+1. Run `backend/sql/005_live_rounds.sql` — adds `profiles.is_admin` and the `live_sessions` / `live_rounds` / `live_bids` tables.
+2. Flag at least one account as admin (see "LIVE Auction Rounds" section above) so `/admin` is reachable.
 
 ### Step 3: Environment Setup
 
@@ -331,9 +376,9 @@ This ensures only recent bidding data is served to users. Adjust as new terms be
 - **Endpoint optimization:** 30s in-process TTL cache on `/leaderboard`, measure polling latency vs. Supabase Realtime
 
 ### Phase 2: Scale & Depth
-- **Live Round Mode** (Tier 4): Real upcoming BOSS windows, live predictions, crowd consensus after results
 - **AI coach** (optional Tier 3): LLM-generated insight (e.g., "Morning classes bid higher") — Anthropic API integration
 - ~~**School-level leaderboards:** Narrower competition scope per SMU department~~ ✓ Done (school tabs on the leaderboard)
+- ~~**Live Round Mode** (Tier 4): Real upcoming BOSS windows, live predictions, crowd consensus after results~~ ✓ Done (admin-run LIVE auction rounds — see "LIVE Auction Rounds" section above)
 
 ### Phase 3: Vision
 - Expand to other university bidding systems
@@ -344,8 +389,8 @@ This ensures only recent bidding data is served to users. Adjust as new terms be
 
 ## Tech Stack
 
-- **Frontend:** React \+ Vite (SF Pro Display / JetBrains Mono for numerals, system-native design)  
-- **Backend:** FastAPI (Supabase Auth, Postgres for predictions + RPC leaderboards)  
+- **Frontend:** React \+ Vite (SF Pro Display / JetBrains Mono for numerals, system-native design), Recharts for data visualization
+- **Backend:** FastAPI (Supabase Auth incl. Google OAuth, Postgres for predictions + RPC leaderboards + LIVE auction tables)  
 - **Hosting:** Vercel (frontend), Supabase (backend)  
 - **Data:** \~50-100 curated historical BOSS rounds with real min/median bid data
 

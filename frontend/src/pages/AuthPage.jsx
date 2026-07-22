@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { api } from "../lib/api";
 import { supabase } from "../lib/supabase";
 
 export default function AuthPage() {
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "check-email"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -15,12 +16,26 @@ export default function AuthPage() {
     setSubmitting(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const name = displayName || email.split("@")[0];
+        const { available } = await api.checkName(name);
+        if (!available) {
+          setError("That name is taken");
+          return;
+        }
+
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { display_name: displayName || email.split("@")[0] } },
+          options: {
+            data: { display_name: name },
+            emailRedirectTo: window.location.origin,
+          },
         });
         if (error) throw error;
+
+        if (!data.session && data.user?.identities?.length > 0) {
+          setMode("check-email");
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -30,6 +45,31 @@ export default function AuthPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleGoogle() {
+    setError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) setError(error.message);
+  }
+
+  if (mode === "check-email") {
+    return (
+      <div className="auth-page">
+        <h1>BidSight</h1>
+        <p className="tagline">Check your inbox</p>
+        <p>
+          We sent a confirmation link to <strong>{email}</strong>. Click it to activate your
+          account.
+        </p>
+        <button className="link-button" onClick={() => setMode("login")}>
+          Back to log in
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -66,6 +106,14 @@ export default function AuthPage() {
           {submitting ? "..." : mode === "signup" ? "Sign up" : "Log in"}
         </button>
       </form>
+
+      <div className="auth-divider">
+        <span>or</span>
+      </div>
+
+      <button className="btn-ghost btn-google" onClick={handleGoogle}>
+        Continue with Google
+      </button>
 
       <button
         className="link-button"
