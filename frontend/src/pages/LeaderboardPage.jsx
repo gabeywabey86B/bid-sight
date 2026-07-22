@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { useApi } from "../lib/useApi";
@@ -80,10 +81,45 @@ function LeaderboardBoards({ school, userId }) {
   );
 }
 
+function FriendsBoards({ userId }) {
+  const { data, error } = useApi(api.friendsLeaderboard, { intervalMs: 15000 });
+
+  const empty =
+    data && data.all_time.length === 0 && data.weekly.length === 0 ? (
+      <p className="meta">
+        No friends yet — <Link to="/profile">add friends to build this board</Link>.
+      </p>
+    ) : null;
+
+  return (
+    <>
+      {error && <p className="error">{error}</p>}
+      {empty ?? (
+        <>
+          <h3>All-time</h3>
+          <AllTimeTable
+            rows={data?.all_time}
+            userId={userId}
+            empty="No scores yet among your friends."
+          />
+
+          <h3>This week</h3>
+          <AllTimeTable
+            rows={data?.weekly}
+            userId={userId}
+            empty="No scores yet this week among your friends."
+          />
+        </>
+      )}
+    </>
+  );
+}
+
 export default function LeaderboardPage() {
   const { session } = useAuth();
   const { data: schoolsData } = useApi(api.getSchools);
   const [school, setSchool] = useState(null);
+  const [view, setView] = useState("global"); // "global" | "friends"
   const userId = session?.user?.id;
 
   return (
@@ -94,20 +130,35 @@ export default function LeaderboardPage() {
         School boards need 5 counted predictions all-time (2 this week) to rank.
       </p>
 
-      <div className="target-toggle school-tabs">
-        <button className={school === null ? "active" : ""} onClick={() => setSchool(null)}>
-          All
+      <div className="target-toggle">
+        <button className={view === "global" ? "active" : ""} onClick={() => setView("global")}>
+          Global
         </button>
-        {(schoolsData?.schools ?? []).map((s) => (
-          <button key={s} className={school === s ? "active" : ""} onClick={() => setSchool(s)}>
-            {s}
-          </button>
-        ))}
+        <button className={view === "friends" ? "active" : ""} onClick={() => setView("friends")}>
+          Friends
+        </button>
       </div>
 
-      {/* key remount: useApi only fetches on mount/interval, so switching tabs
-          must remount the boards to fetch the new school immediately. */}
-      <LeaderboardBoards key={school ?? "all"} school={school} userId={userId} />
+      {view === "global" ? (
+        <>
+          <div className="target-toggle school-tabs">
+            <button className={school === null ? "active" : ""} onClick={() => setSchool(null)}>
+              All
+            </button>
+            {(schoolsData?.schools ?? []).map((s) => (
+              <button key={s} className={school === s ? "active" : ""} onClick={() => setSchool(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {/* key remount: useApi only fetches on mount/interval, so switching tabs
+              must remount the boards to fetch the new school immediately. */}
+          <LeaderboardBoards key={school ?? "all"} school={school} userId={userId} />
+        </>
+      ) : (
+        <FriendsBoards userId={userId} />
+      )}
     </div>
   );
 }

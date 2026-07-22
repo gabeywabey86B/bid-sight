@@ -1,8 +1,9 @@
 """Training leaderboard via the DB aggregation functions, global or per-school."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from ..auth import current_user_id
 from ..supabase_client import get_client
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
@@ -17,7 +18,7 @@ def leaderboard(limit: int = Query(20, ge=1, le=100), school: str | None = Query
     all_time = (
         sb.rpc(
             "training_leaderboard",
-            {"p_limit": limit, "p_weekly": False, "p_min_games": min_all, "p_school": school},
+            {"p_limit": 5, "p_weekly": False, "p_min_games": min_all, "p_school": school},
         )
         .execute()
         .data
@@ -32,3 +33,27 @@ def leaderboard(limit: int = Query(20, ge=1, le=100), school: str | None = Query
     )
     top_scores = sb.rpc("top_scores", {"p_limit": 10, "p_school": school}).execute().data
     return {"all_time": all_time, "weekly": weekly, "top_scores": top_scores}
+
+
+@router.get("/friends")
+def friends_leaderboard(user_id: str = Depends(current_user_id)):
+    sb = get_client()
+    # Friend groups are small, so both boards use a low eligibility bar
+    # instead of the global board's 5/10 minimums.
+    all_time = (
+        sb.rpc(
+            "training_leaderboard",
+            {"p_limit": 20, "p_weekly": False, "p_min_games": 1, "p_friends_of": user_id},
+        )
+        .execute()
+        .data
+    )
+    weekly = (
+        sb.rpc(
+            "training_leaderboard",
+            {"p_limit": 20, "p_weekly": True, "p_min_games": 1, "p_friends_of": user_id},
+        )
+        .execute()
+        .data
+    )
+    return {"all_time": all_time, "weekly": weekly}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
+import BidHistoryChart from "../components/BidHistoryChart";
 import { useApi } from "../lib/useApi";
 
 // "Day: Tue, start time: 15:30,end time : 17:00|Day: Thu, start time: 15:30,end time : 17:00"
@@ -291,7 +292,7 @@ export default function TrainingPage() {
 
   function switchTarget(newTarget) {
     setTarget(newTarget);
-    loadRound(newTarget, school);
+    if (round) loadRound(newTarget, school);
   }
 
   function switchSchool(newSchool) {
@@ -370,6 +371,9 @@ export default function TrainingPage() {
                 </button>
               )}
             </div>
+            {history && history.length > 1 && (
+              <BidHistoryChart key={round.course_id} rows={filteredRows} target={target} />
+            )}
             {history === null && <p className="meta">Loading history...</p>}
             {history && history.length === 0 && (
               <p className="meta">No prior bidding data for this course.</p>

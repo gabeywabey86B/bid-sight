@@ -66,4 +66,40 @@ export const api = {
   myPredictions: () => request("/predictions/me"),
   leaderboard: (limit = 20, school = null) =>
     request(`/leaderboard?limit=${limit}${school ? `&school=${encodeURIComponent(school)}` : ""}`),
+  searchCourses: (q, limit = 200) =>
+    request(`/courses/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  checkName: (name) => request(`/profiles/check-name?name=${encodeURIComponent(name)}`),
+  getMyProfile: () => request("/profiles/me"),
+  updateDisplayName: (display_name) =>
+    request("/profiles/me", { method: "PATCH", body: { display_name } }),
+  searchProfiles: (q) => request(`/profiles/search?q=${encodeURIComponent(q)}`),
+  getFriends: () => request("/friends"),
+  addFriend: (friend_id) => request("/friends", { method: "POST", body: { friend_id } }),
+  removeFriend: (friend_id) => request(`/friends/${encodeURIComponent(friend_id)}`, { method: "DELETE" }),
+  friendsLeaderboard: () => request("/leaderboard/friends"),
+  getLiveCurrent: () => request("/live/current"),
+  getLiveRound: (id) => request(`/live/rounds/${encodeURIComponent(id)}`),
+  submitLiveBid: (roundId, amount) =>
+    request(`/live/rounds/${encodeURIComponent(roundId)}/bids`, {
+      method: "POST",
+      body: { amount },
+    }),
+  adminListSessions: () => request("/live/admin/sessions"),
+  adminCreateSession: (name) =>
+    request("/live/admin/sessions", { method: "POST", body: { name } }),
+  adminListRounds: (sessionId) =>
+    request(`/live/admin/sessions/${encodeURIComponent(sessionId)}/rounds`),
+  adminCreateRound: (sessionId, round) =>
+    request(`/live/admin/sessions/${encodeURIComponent(sessionId)}/rounds`, {
+      method: "POST",
+      body: round,
+    }),
+  adminOpenRound: (id) => request(`/live/admin/rounds/${encodeURIComponent(id)}/open`, { method: "POST" }),
+  adminCloseRound: (id) =>
+    request(`/live/admin/rounds/${encodeURIComponent(id)}/close`, { method: "POST" }),
+  adminRoundBids: (id) => request(`/live/admin/rounds/${encodeURIComponent(id)}/bids`),
+  adminSeatsRemaining: (courseCode, section) =>
+    request(
+      `/live/admin/seats-remaining?course_code=${encodeURIComponent(courseCode)}&section=${encodeURIComponent(section)}`
+    ),
 };

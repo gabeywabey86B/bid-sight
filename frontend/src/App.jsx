@@ -1,4 +1,4 @@
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { supabase } from "./lib/supabase";
 import AuthPage from "./pages/AuthPage";
@@ -6,6 +6,9 @@ import TrainingPage from "./pages/TrainingPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import ProgressPage from "./pages/ProgressPage";
 import SearchPage from "./pages/SearchPage";
+import ProfilePage from "./pages/ProfilePage";
+import LivePage from "./pages/LivePage";
+import AdminPage from "./pages/AdminPage";
 import "./App.css";
 
 function RequireAuth({ children }) {
@@ -15,17 +18,28 @@ function RequireAuth({ children }) {
   return children;
 }
 
+function RequireAdmin({ children }) {
+  const { session, loading, isAdmin, profileLoading } = useAuth();
+  if (loading || profileLoading) return <p className="center-msg">Loading...</p>;
+  if (!session) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/training" replace />;
+  return children;
+}
+
 function Layout({ children }) {
-  const { session } = useAuth();
+  const { session, isAdmin } = useAuth();
   return (
     <div className="app-shell">
       {session && (
         <nav className="navbar">
-          <span className="brand">BidSight</span>
+          <Link to="/training" className="brand">BidSight</Link>
           <NavLink to="/training">Training</NavLink>
           <NavLink to="/search">Search</NavLink>
           <NavLink to="/progress">Progress</NavLink>
           <NavLink to="/leaderboard">Leaderboard</NavLink>
+          <NavLink to="/profile">Profile</NavLink>
+          <NavLink to="/live">Live</NavLink>
+          {isAdmin && <NavLink to="/admin">Admin</NavLink>}
           <button className="link-button" onClick={() => supabase.auth.signOut()}>
             Log out
           </button>
@@ -76,6 +90,30 @@ function AppRoutes() {
             <RequireAuth>
               <LeaderboardPage />
             </RequireAuth>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <ProfilePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/live"
+          element={
+            <RequireAuth>
+              <LivePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminPage />
+            </RequireAdmin>
           }
         />
         <Route path="*" element={<Navigate to="/training" replace />} />

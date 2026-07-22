@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useApi } from "../lib/useApi";
+import ScoreChart from "../components/ScoreChart";
 
 const WINDOW = 5;
 
@@ -10,27 +11,6 @@ function withRollingAverage(scored) {
     const rolling = windowSlice.reduce((sum, r) => sum + r.score, 0) / windowSlice.length;
     return { ...p, rolling };
   });
-}
-
-function Sparkline({ points }) {
-  if (points.length < 2) return null;
-  const w = 600;
-  const h = 160;
-  const pad = 8;
-  const xStep = (w - pad * 2) / (points.length - 1);
-  const toY = (score) => h - pad - score * (h - pad * 2);
-  const trending = points.at(-1).rolling >= points[0].rolling;
-
-  const path = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${pad + i * xStep} ${toY(p.rolling)}`)
-    .join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="sparkline" preserveAspectRatio="none">
-      <line x1={pad} y1={toY(0.5)} x2={w - pad} y2={toY(0.5)} className="sparkline-mid" />
-      <path d={path} className={`sparkline-path ${trending ? "" : "down"}`} fill="none" />
-    </svg>
-  );
 }
 
 export default function ProgressPage() {
@@ -116,7 +96,7 @@ export default function ProgressPage() {
             )}
           </div>
 
-          <Sparkline points={chronological} />
+          <ScoreChart points={chronological} />
 
           <table className="history-table">
             <thead>
