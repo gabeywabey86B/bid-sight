@@ -1,0 +1,1 @@
+INSERT INTO "public"."live_bids" ("id", "round_id", "user_id", "amount", "is_winner", "created_at") VALUES ('e70483b8-4bf6-494a-bdcf-2ab762576953', '7201be83-367d-4e75-b924-5343caeeaf04', '21f8c973-aaa9-4535-a83d-ac18ad19acd7', '22.33', true, '2026-07-22 17:04:37.797162+00');

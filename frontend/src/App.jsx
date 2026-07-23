@@ -2,6 +2,7 @@ import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { supabase } from "./lib/supabase";
 import AuthPage from "./pages/AuthPage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
 import TrainingPage from "./pages/TrainingPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import ProgressPage from "./pages/ProgressPage";
@@ -27,7 +28,7 @@ function RequireAdmin({ children }) {
 }
 
 function Layout({ children }) {
-  const { session, isAdmin } = useAuth();
+  const { session, isAdmin, profileError } = useAuth();
   return (
     <div className="app-shell">
       {session && (
@@ -45,6 +46,7 @@ function Layout({ children }) {
           </button>
         </nav>
       )}
+      {session && profileError && <p className="auth-warning">{profileError}</p>}
       <main>{children}</main>
     </div>
   );
@@ -60,6 +62,7 @@ function AppRoutes() {
           path="/login"
           element={loading ? null : session ? <Navigate to="/training" replace /> : <AuthPage />}
         />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route
           path="/training"
           element={
