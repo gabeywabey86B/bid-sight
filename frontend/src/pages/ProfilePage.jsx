@@ -3,10 +3,6 @@ import { api } from "../lib/api";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState("");
-  const [nameError, setNameError] = useState(null);
-  const [saving, setSaving] = useState(false);
 
   const [friends, setFriends] = useState(null);
   const [query, setQuery] = useState("");
@@ -29,27 +25,6 @@ export default function ProfilePage() {
     loadProfile();
     loadFriends();
   }, []);
-
-  function startEditing() {
-    setNameInput(profile.display_name);
-    setNameError(null);
-    setEditing(true);
-  }
-
-  async function saveName(e) {
-    e.preventDefault();
-    setNameError(null);
-    setSaving(true);
-    try {
-      const updated = await api.updateDisplayName(nameInput.trim());
-      setProfile(updated);
-      setEditing(false);
-    } catch (err) {
-      setNameError(err.message.includes("409") ? "That name is taken" : err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -89,37 +64,9 @@ export default function ProfilePage() {
 
       {profile && (
         <div className="round-card">
-          {editing ? (
-            <form onSubmit={saveName} className="auth-form">
-              <input
-                type="text"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                autoFocus
-              />
-              {nameError && <p className="error">{nameError}</p>}
-              <div className="target-toggle">
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? "Saving..." : "Save"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setEditing(false)}
-                  disabled={saving}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            <p>
-              <strong>{profile.display_name}</strong>{" "}
-              <button className="link-button" onClick={startEditing}>
-                Edit
-              </button>
-            </p>
-          )}
+          <p>
+            <strong>{profile.display_name}</strong>
+          </p>
         </div>
       )}
 
