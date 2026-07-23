@@ -470,7 +470,8 @@ button {
 .auth-form input::placeholder,
 .guess-form input::placeholder,
 .search-form input::placeholder {
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.6;
 }
 
 .auth-form input:focus,
@@ -608,7 +609,8 @@ tbody tr.own-row:hover {
 .sort-button {
   background: none;
   border: none;
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.6;
   font: inherit;
   font-weight: 500;
   font-size: 0.75rem;
@@ -668,7 +670,8 @@ tbody tr.own-row:hover {
 }
 
 .tagline {
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.7;
   margin-bottom: var(--space-2xl);
   font-size: 1rem;
 }
@@ -678,7 +681,8 @@ tbody tr.own-row:hover {
   align-items: center;
   gap: var(--space-md);
   margin: var(--space-lg) 0;
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.6;
   font-size: 0.875rem;
 }
 
@@ -883,7 +887,8 @@ tbody tr.own-row:hover {
 
 .big-stat-label {
   font-size: 0.875rem;
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.7;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -936,7 +941,8 @@ tbody tr.own-row:hover {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.6;
 }
 
 .chart-container {
@@ -1046,7 +1052,8 @@ tbody tr.own-row:hover {
 .center-msg {
   text-align: center;
   margin-top: 60px;
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.7;
   font-size: 1rem;
 }
 
@@ -1204,7 +1211,8 @@ tbody tr.own-row:hover {
 
 .loading-text {
   font-size: 0.95rem;
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.7;
   margin: 0;
   font-weight: 500;
 }
