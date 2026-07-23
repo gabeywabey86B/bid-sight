@@ -279,7 +279,7 @@ def get_round(round_id: str, user_id: str = Depends(current_user_id)):
 
 
 class BidIn(BaseModel):
-    amount: float = Field(gt=0)
+    amount: float = Field(ge=0, le=200)
 
 
 @router.post("/rounds/{round_id}/bids")

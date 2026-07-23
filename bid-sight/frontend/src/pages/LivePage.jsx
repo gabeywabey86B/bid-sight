@@ -105,8 +105,9 @@ export default function LivePage() {
               <input
                 type="number"
                 step="0.01"
-                min="0.01"
-                placeholder="Your bid (credits)"
+                min="0"
+                max="200"
+                placeholder="Your bid (credits, 0-200)"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required

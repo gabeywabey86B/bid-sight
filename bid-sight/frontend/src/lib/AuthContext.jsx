@@ -17,8 +17,10 @@ export function AuthProvider({ children }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  const userId = session?.user?.id ?? null;
+
   useEffect(() => {
-    if (!session) {
+    if (!userId) {
       setIsAdmin(false);
       return;
     }
@@ -28,7 +30,7 @@ export function AuthProvider({ children }) {
       .then((profile) => setIsAdmin(!!profile.is_admin))
       .catch(() => setIsAdmin(false))
       .finally(() => setProfileLoading(false));
-  }, [session]);
+  }, [userId]);
 
   return (
     <AuthContext.Provider

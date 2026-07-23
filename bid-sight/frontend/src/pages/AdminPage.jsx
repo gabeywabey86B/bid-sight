@@ -49,7 +49,6 @@ function RoundRow({ round, onOpen, onClose, onDelete, onSelect, selected }) {
 // ladder. Capacity is optional — the backend falls back to the section's
 // opening_vacancy on record.
 function CreateLadderForm({ sessionId, onCreated }) {
-  const { data: codesData } = useApi(api.getCourseCodes);
   const [code, setCode] = useState("");
   const [section, setSection] = useState("");
   const [capacity, setCapacity] = useState("");
@@ -58,8 +57,8 @@ function CreateLadderForm({ sessionId, onCreated }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!code) {
-      setError("Pick a course code.");
+    if (!code.trim()) {
+      setError("Enter a course code.");
       return;
     }
     if (!section.trim()) {
@@ -74,7 +73,8 @@ function CreateLadderForm({ sessionId, onCreated }) {
     setError(null);
     setSubmitting(true);
     try {
-      await api.adminCreateLadder(sessionId, code, section.trim(), cap);
+      await api.adminCreateLadder(sessionId, code.trim(), section.trim(), cap);
+      setCode("");
       setSection("");
       setCapacity("");
       onCreated();
@@ -87,14 +87,11 @@ function CreateLadderForm({ sessionId, onCreated }) {
 
   return (
     <form onSubmit={handleSubmit} className="auth-form">
-      <select value={code} onChange={(e) => setCode(e.target.value)}>
-        <option value="">Course code...</option>
-        {(codesData?.codes ?? []).map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
+      <input
+        placeholder="Course code (e.g. CS101)"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+      />
       <input
         placeholder="Section (e.g. G3)"
         value={section}
