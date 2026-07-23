@@ -1051,7 +1051,8 @@ tbody tr.own-row:hover {
 }
 
 .meta {
-  color: var(--color-muted);
+  color: var(--color-foreground);
+  opacity: 0.7;
   font-size: 0.875rem;
 }
 
@@ -1083,7 +1084,6 @@ tbody tr.own-row:hover {
 .theme-toggle {
   background: none;
   border: none;
-  font-size: 1.25rem;
   cursor: pointer;
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
@@ -1094,6 +1094,15 @@ tbody tr.own-row:hover {
   min-width: 44px;
   min-height: 44px;
   margin-right: var(--space-sm);
+  color: var(--color-foreground);
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .theme-toggle:hover {
