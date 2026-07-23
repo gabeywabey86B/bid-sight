@@ -1,0 +1,1 @@
+INSERT INTO "public"."live_sessions" ("id", "name", "created_by", "status", "created_at") VALUES ('2a9f60b7-9cfe-4629-bf7f-d9292b6bafe0', 'jun sheng and marcus cooking class ', '21f8c973-aaa9-4535-a83d-ac18ad19acd7', 'active', '2026-07-22 17:02:02.199873+00');
