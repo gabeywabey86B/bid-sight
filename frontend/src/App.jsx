@@ -1,5 +1,6 @@
 import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
+import { ThemeProvider, useTheme } from "./lib/ThemeContext";
 import { supabase } from "./lib/supabase";
 import AuthPage from "./pages/AuthPage";
 import TrainingPage from "./pages/TrainingPage";
@@ -9,18 +10,19 @@ import SearchPage from "./pages/SearchPage";
 import ProfilePage from "./pages/ProfilePage";
 import LivePage from "./pages/LivePage";
 import AdminPage from "./pages/AdminPage";
+import LoadingScreen from "./components/LoadingScreen";
 import "./App.css";
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth();
-  if (loading) return <p className="center-msg">Loading...</p>;
+  if (loading) return <LoadingScreen />;
   if (!session) return <Navigate to="/login" replace />;
   return children;
 }
 
 function RequireAdmin({ children }) {
   const { session, loading, isAdmin, profileLoading } = useAuth();
-  if (loading || profileLoading) return <p className="center-msg">Loading...</p>;
+  if (loading || profileLoading) return <LoadingScreen />;
   if (!session) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/training" replace />;
   return children;
@@ -28,6 +30,7 @@ function RequireAdmin({ children }) {
 
 function Layout({ children }) {
   const { session, isAdmin } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   return (
     <div className="app-shell">
       {session && (
@@ -40,6 +43,10 @@ function Layout({ children }) {
           <NavLink to="/profile">Profile</NavLink>
           <NavLink to="/live">Live</NavLink>
           {isAdmin && <NavLink to="/admin">Admin</NavLink>}
+          <div className="navbar-spacer"></div>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle dark mode">
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
           <button className="link-button" onClick={() => supabase.auth.signOut()}>
             Log out
           </button>
@@ -124,8 +131,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

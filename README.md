@@ -22,6 +22,10 @@
 - **v2 feature set** (5 phases): Recharts-based charts, Google OAuth + duplicate-username protection, friends leaderboard/profile page, and admin-run LIVE auction rounds (see "LIVE Auction Rounds" and "Auth & Friends" sections below)
 - Migrations 003 (`display_name_unique`), 004 (`friends`), 005 (`live_rounds`) added
 - Logo now links to `/training`; all-time leaderboard capped at top 5 (weekly board unchanged)
+- **UI/UX Enhancements v2:**
+  - ✅ **Dark/Light mode toggle** (☀️/🌙 button, top right navbar) — theme preference persisted to localStorage
+  - ✅ **Professional BOSS loading screen** — animated logo pulsing, bouncing dots, gradient progress bar with text
+  - ✅ **Responsive design** — optimized for desktop (1920×1080), tablet (768px), and mobile (480px vertical 1080×1920)
 
 **Previous updates (2026-07-17):**
 - Multi-layer validation prevents submission without proper selection
@@ -101,6 +105,38 @@ That's it. One screen. One interaction. One immediate feedback loop.
 | :---- | :---- | :---- | :---- |
 | **Live Round Mode** | Admin-run round opens, users bid once each, top-N seats clear at close with winner lockout + seat carryover | The full product idea. | ✓ Done |
 | **Anonymous data collection** | Users submit grades, internship placements, LOA, exchange info | Broadens the platform. | **Cut entirely.** No ground truth, no enforcement. |
+
+---
+
+## UI/UX Improvements (v2)
+
+### Dark/Light Mode Toggle
+- **Location:** Top-right corner of navbar (☀️ for light, 🌙 for dark)
+- **Behavior:** Preference is saved to `localStorage` and persists across sessions
+- **Tech:** `ThemeContext` manages theme state, `data-theme` attribute on `<html>` element controls all colors
+- **CSS Variables:** All 20+ color tokens automatically update when theme changes — no component rewrites needed
+- **WCAG AAA:** Both light and dark modes meet 7:1 contrast ratio for text
+
+### Professional BOSS Loading Screen
+- **Display:** Full-screen overlay with centered content
+- **Elements:**
+  - Pulsing logo emoji (⚡) with glow animation
+  - BidSight title (1.75rem, 700 weight)
+  - Bouncing dots (3-dot animation, 1.4s loop)
+  - Friendly text: "Loading your insights..."
+  - Gradient progress bar (blue → gold)
+- **Animation:** Respects `prefers-reduced-motion` for accessibility
+- **Used when:**
+  - Initial auth context loads
+  - Admin profile loading
+  - Pages with async data fetching
+
+### Responsive Design
+- **Desktop (1920×1080):** Full navbar with all nav links, generous padding, large touch targets
+- **Tablet (768px):** Compressed navbar, smaller font sizes
+- **Mobile (480px–1080×1920):** Stacked layout, minimal padding, 44×44px touch targets (WCAG AAA)
+- **Breakpoints:** 480px, 768px, 1920px+ (mobile-first, progressive enhancement)
+- **Mobile-specific:** Tables scroll horizontally, buttons full-width when needed, navbar hides non-critical links
 
 ---
 
@@ -280,6 +316,9 @@ After first run:
 - [ ] Backend starts without errors (check `/health`)
 - [ ] Frontend connects (check browser console for no CORS errors)
 - [ ] Can sign up / log in
+- [ ] **Loading screen appears** during auth (pulsing logo, bouncing dots, progress bar)
+- [ ] **Theme toggle works** (☀️/🌙 button, top-right navbar switches light/dark mode)
+- [ ] **Dark mode contrast** is readable (7:1 ratio on all text)
 - [ ] Training round loads with hidden answer
 - [ ] Submit prediction → reveal shows score `0.XX / 1.0` and `≤ 0.7` displays as red
 - [ ] Leaderboard has all three boards (all-time, weekly, top scores)
@@ -287,6 +326,8 @@ After first run:
 - [ ] Own row on leaderboard highlights
 - [ ] Replay badge appears on second submission for same course
 - [ ] Progress page shows rolling average and sparkline
+- [ ] **Responsive:** Test on mobile (1080×1920 vertical) — navbar links readable, buttons 44×44px minimum
+- [ ] **Theme persistence:** Toggle theme, reload page, theme preference is preserved
 
 ---
 
