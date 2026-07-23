@@ -18,6 +18,9 @@
 
 **In progress:** Accuracy breakdown by course, AI coach
 
+**Recent updates (2026-07-24):**
+- Collapsed the duplicated `bid-sight/bid-sight/` nesting — `backend/`, `frontend/`, and all docs now live directly at the repo root. No import paths or configs referenced the old nested location (verified via full-repo search), so this was a pure file-move with no code changes.
+
 **Recent updates (2026-07-23):**
 - **v2 feature set** (5 phases): Recharts-based charts, Google OAuth + duplicate-username protection, friends leaderboard/profile page, and admin-run LIVE auction rounds (see "LIVE Auction Rounds" and "Auth & Friends" sections below)
 - Migrations 003 (`display_name_unique`), 004 (`friends`), 005 (`live_rounds`) added
@@ -203,6 +206,12 @@ cd bid-sight
 
 # Install backend dependencies
 cd backend
+```
+
+`backend/` and `frontend/` live at the repo root (this file's `bid-sight` clone directory) — there is no nested `bid-sight/bid-sight/` layout.
+
+```bash
+
 pip install -r requirements.txt
 
 # Install frontend dependencies
