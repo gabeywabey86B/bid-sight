@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-02T02:00:00Z",
+  "title": "Design System: BidSight",
+  "extensions": {
+    "colorMeta": {
+      "bg": { "role": "neutral", "displayName": "Paper", "canonical": "oklch(1 0 0)", "tonalRamp": ["oklch(0.18 0.012 250)", "oklch(0.30 0.012 250)", "oklch(0.50 0.012 250)", "oklch(0.62 0.010 250)", "oklch(0.75 0.008 250)", "oklch(0.90 0.005 250)", "oklch(0.955 0.005 250)", "oklch(0.98 0.003 250)"] },
+      "primary": { "role": "primary", "displayName": "BidSight Blue", "canonical": "oklch(0.55 0.17 254)", "tonalRamp": ["oklch(0.22 0.09 254)", "oklch(0.32 0.13 254)", "oklch(0.40 0.15 254)", "oklch(0.46 0.17 254)", "oklch(0.55 0.17 254)", "oklch(0.66 0.14 254)", "oklch(0.78 0.09 254)", "oklch(0.90 0.04 254)"] },
+      "accent": { "role": "secondary", "displayName": "Ledger Green", "canonical": "oklch(0.62 0.19 150)", "tonalRamp": ["oklch(0.22 0.09 150)", "oklch(0.32 0.13 150)", "oklch(0.42 0.16 150)", "oklch(0.52 0.18 150)", "oklch(0.62 0.19 150)", "oklch(0.72 0.15 150)", "oklch(0.83 0.10 150)", "oklch(0.93 0.05 150)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "oklch(0.18 0.012 250)" },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "oklch(0.50 0.012 250)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page-level headings only." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings within a page." },
+      "body": { "displayName": "Body", "purpose": "Prose, instructions, form labels." },
+      "label": { "displayName": "Label", "purpose": "Table headers, nav links, filter chips." },
+      "numeric": { "displayName": "Numeric", "purpose": "Inline bid/score/error values, table cells." },
+      "numeric-lg": { "displayName": "Numeric Large", "purpose": "Hero numbers: reveal score, rolling average." }
+    },
+    "shadows": [
+      { "name": "card", "value": "0 1px 2px oklch(0.18 0.012 250 / 0.04), 0 4px 12px oklch(0.18 0.012 250 / 0.06)", "purpose": "Round card, history table, leaderboard/progress tables." },
+      { "name": "raised", "value": "0 4px 16px oklch(0.18 0.012 250 / 0.10)", "purpose": "Open multiselect dropdown, anything floating above content." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Default ease-out-expo for state transitions (hover, reveal, filter open)." },
+      { "name": "duration-fast", "value": "120ms", "purpose": "Hover/focus color transitions." },
+      { "name": "duration-base", "value": "220ms", "purpose": "Reveal moment, sparkline draw-in." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action per screen: Submit guess, Sign up.",
+      "html": "<button class=\"ds-btn-primary\">Submit guess</button>",
+      "css": ".ds-btn-primary { background: oklch(0.55 0.17 254); color: oklch(1 0 0); border: none; border-radius: 8px; padding: 11px 22px; font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif; font-weight: 600; font-size: 0.9375rem; cursor: pointer; transition: background 120ms cubic-bezier(0.16,1,0.3,1), transform 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { background: oklch(0.46 0.17 254); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 2px solid oklch(0.55 0.17 254); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary actions: Log out, Next section, Clear filter.",
+      "html": "<button class=\"ds-btn-ghost\">Clear</button>",
+      "css": ".ds-btn-ghost { background: oklch(0.98 0.003 250); color: oklch(0.18 0.012 250); border: none; border-radius: 8px; padding: 11px 22px; font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif; font-weight: 500; font-size: 0.9375rem; cursor: pointer; transition: background 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-ghost:hover { background: oklch(0.955 0.005 250); } .ds-btn-ghost:focus-visible { outline: 2px solid oklch(0.55 0.17 254); outline-offset: 2px; }"
+    },
+    {
+      "name": "Score Badge (High)",
+      "kind": "chip",
+      "refersTo": "badge-score-high",
+      "description": "Attached to a strong score or positive trend. Never decorative.",
+      "html": "<span class=\"ds-badge-high\">92.4</span>",
+      "css": ".ds-badge-high { display: inline-flex; align-items: center; background: oklch(0.62 0.19 150); color: oklch(1 0 0); border-radius: 999px; padding: 3px 12px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 0.875rem; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Data Table",
+      "kind": "custom",
+      "refersTo": "table",
+      "description": "Bid history table: soft card shadow instead of border, monospace numeric cells, one internal header rule, row hover.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Term</th><th>Median</th></tr></thead><tbody><tr><td>2024-25 Term 1</td><td class=\"ds-num\">31.06</td></tr></tbody></table>",
+      "css": ".ds-table { width: 100%; border-collapse: collapse; background: oklch(1 0 0); border-radius: 14px; box-shadow: 0 1px 2px oklch(0.18 0.012 250 / 0.04), 0 4px 12px oklch(0.18 0.012 250 / 0.06); overflow: hidden; } .ds-table th { text-align: left; font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif; font-weight: 500; font-size: 0.8125rem; color: oklch(0.50 0.012 250); padding: 10px 14px; border-bottom: 1px solid oklch(0.90 0.005 250); } .ds-table td { padding: 10px 14px; color: oklch(0.18 0.012 250); font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif; } .ds-table .ds-num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; } .ds-table tr:hover td { background: oklch(0.955 0.005 250); }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Text/number inputs across auth and guess forms — filled, no border at rest.",
+      "html": "<input class=\"ds-input\" type=\"number\" placeholder=\"Your guess\" />",
+      "css": ".ds-input { background: oklch(0.98 0.003 250); color: oklch(0.18 0.012 250); border: none; border-radius: 8px; padding: 11px 14px; font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif; font-size: 1rem; transition: box-shadow 120ms cubic-bezier(0.16,1,0.3,1), background 120ms cubic-bezier(0.16,1,0.3,1); } .ds-input:focus { outline: none; background: oklch(1 0 0); box-shadow: 0 0 0 2px oklch(0.55 0.17 254); } .ds-input::placeholder { color: oklch(0.50 0.012 250); }"
+    },
+    {
+      "name": "Nav Bar",
+      "kind": "nav",
+      "refersTo": "navbar",
+      "description": "Sticky top navigation with translucent blur — the one purposeful use of backdrop-filter in the system.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-brand\">BidSight</span><a class=\"ds-nav-link ds-nav-link--active\" href=\"#\">Training</a><a class=\"ds-nav-link\" href=\"#\">Progress</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 28px; background: oklch(1 0 0 / 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid oklch(0.90 0.005 250); padding: 16px 24px; position: sticky; top: 0; } .ds-nav-brand { font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif; font-weight: 700; color: oklch(0.18 0.012 250); margin-right: auto; } .ds-nav-link { font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif; font-weight: 500; font-size: 0.8125rem; color: oklch(0.50 0.012 250); text-decoration: none; padding-bottom: 4px; border-bottom: 2px solid transparent; transition: color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-nav-link--active { color: oklch(0.18 0.012 250); border-bottom-color: oklch(0.55 0.17 254); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Refined Ledger",
+    "overview": "BidSight keeps the discipline of a financial statement — white surface, exact ink, numbers set in monospace so they line up like a ledger — but now expressed with Apple's software polish rather than a bank's severity. The previous pass (flat, sharp 4px corners, hard hairlines everywhere, zero shadow) was correct in spirit but too austere to feel considered. This pass keeps the same restraint while adding what Apple actually does: generous whitespace, soft single-source shadows instead of hard borders, a livelier systemBlue-family accent, SF Pro-first type, and smooth ease-out motion on every interactive state.",
+    "keyCharacteristics": [
+      "Pure white background; elevation comes from soft single-source shadows, not borders.",
+      "A livelier systemBlue-family accent — lighter and more alive than the previous navy.",
+      "Every bid, score, and error value renders in monospace with tabular figures.",
+      "Generous spacing throughout — trades density for calm.",
+      "SF Pro (via -apple-system) leads the font stack, Inter as cross-platform fallback.",
+      "Motion is standard on every hover/focus/reveal — never absent."
+    ],
+    "rules": [
+      { "name": "The One-Signal Rule", "body": "BidSight Blue is the only color allowed to mean \"act on this.\" Everything else is Ink or Muted.", "section": "colors" },
+      { "name": "The Green Is Earned Rule", "body": "Ledger Green only ever appears attached to a positive outcome — never a generic success checkmark.", "section": "colors" },
+      { "name": "The Shadow-Over-Border Rule", "body": "A surface gets either a soft shadow (cards, dropdowns) or a single hairline (in-container dividers) — never both stacked on the same edge.", "section": "elevation" },
+      { "name": "The Mono-For-Value Rule", "body": "Any number the user compares, scans, or is judged on renders in JetBrains Mono with tabular-nums. Labels stay in the system sans.", "section": "typography" },
+      { "name": "The No-Wide-Glow Rule", "body": "Shadow blur stays ≤16px and opacity ≤0.10 — felt as a surface shift, never a spotlight.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use soft single-source shadows (≤16px blur, ≤0.10 opacity) for cards, tables, and dropdowns instead of hairline borders.",
+      "Do use the system font stack (-apple-system first) so the app feels native.",
+      "Do give every interactive element a smooth ease-out transition on hover/focus/active.",
+      "Do render every bid, score, and error value in JetBrains Mono with tabular-nums.",
+      "Do reserve Ledger Green exclusively for positive score/trend moments.",
+      "Do use generous spacing — 20-32px section gaps, 11-14px control padding."
+    ],
+    "donts": [
+      "Don't use a cream, off-white, or warm-tinted background anywhere.",
+      "Don't stack a hairline border AND a shadow on the same surface edge (the ghost-card pattern).",
+      "Don't go back to zero-shadow, all-hairline severity — that read as a spreadsheet, not a refined app.",
+      "Don't use backdrop-filter decoratively — reserved for the sticky nav only.",
+      "Don't introduce a third saturated color beyond BidSight Blue and Ledger Green.",
+      "Don't round buttons or containers past 14px.",
+      "Don't revert to the near-black terminal costume from two iterations ago."
+    ]
+  }
+}
