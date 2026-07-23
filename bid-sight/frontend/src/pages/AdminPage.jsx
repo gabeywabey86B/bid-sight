@@ -6,10 +6,13 @@ function RoundRow({ round, onOpen, onClose, onDelete, onSelect, selected }) {
   // Later windows are placeholders until they open — their seat count only
   // becomes real once every earlier window has cleared.
   const seats =
-    round.status === "draft" && round.round_index > 0 ? "—" : round.seats_allocated;
+    round.status === "draft" && round.round_index > 0 ? "—" : round.seats_allocated ?? "—";
+  // Loose == catches undefined too: rounds created before the ladder existed
+  // have no round_index, and `undefined + 1` renders as NaN.
+  const position = round.round_index == null ? "—" : round.round_index + 1;
   return (
     <tr className={selected ? "own-row" : ""}>
-      <td className="num-col">{round.round_index === null ? "" : round.round_index + 1}</td>
+      <td className="num-col">{position}</td>
       <td>{round.round_label}</td>
       <td className="num-col">{seats}</td>
       <td className="num-col">
@@ -42,57 +45,37 @@ function RoundRow({ round, onOpen, onClose, onDelete, onSelect, selected }) {
   );
 }
 
-// Pick a real section, then generate the whole 12-window BOSS ladder from it.
-// Reuses /courses/search, which already returns opening_vacancy per section.
+// Pick a course code from the list, type the section, generate the 12-window
+// ladder. Capacity is optional — the backend falls back to the section's
+// opening_vacancy on record.
 function CreateLadderForm({ sessionId, onCreated }) {
+  const { data: codesData } = useApi(api.getCourseCodes);
   const [code, setCode] = useState("");
-  const [sections, setSections] = useState([]);
-  const [courseId, setCourseId] = useState("");
+  const [section, setSection] = useState("");
   const [capacity, setCapacity] = useState("");
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function lookup() {
-    const q = code.trim();
-    if (q.length < 2) return;
-    setError(null);
-    try {
-      const { results } = await api.searchCourses(q);
-      // One row per (course_id, bidding_window) comes back; a section is a
-      // course_id, so collapse to the first row for each.
-      const seen = new Map();
-      for (const r of results) if (!seen.has(r.course_id)) seen.set(r.course_id, r);
-      setSections([...seen.values()]);
-      if (seen.size === 0) setError("No sections found for that course code.");
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  function pick(id) {
-    setCourseId(id);
-    const s = sections.find((x) => x.course_id === id);
-    setCapacity(s?.opening_vacancy != null ? String(s.opening_vacancy) : "");
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!courseId) {
-      setError("Pick a section first.");
+    if (!code) {
+      setError("Pick a course code.");
       return;
     }
-    const cap = Number(capacity);
-    if (!Number.isInteger(cap) || cap <= 0) {
-      setError("Capacity must be a positive whole number.");
+    if (!section.trim()) {
+      setError("Enter a section, e.g. G3.");
+      return;
+    }
+    const cap = capacity.trim() === "" ? null : Number(capacity);
+    if (cap !== null && (!Number.isInteger(cap) || cap <= 0)) {
+      setError("Capacity must be a positive whole number, or blank.");
       return;
     }
     setError(null);
     setSubmitting(true);
     try {
-      await api.adminCreateLadder(sessionId, courseId, cap);
-      setCode("");
-      setSections([]);
-      setCourseId("");
+      await api.adminCreateLadder(sessionId, code, section.trim(), cap);
+      setSection("");
       setCapacity("");
       onCreated();
     } catch (err) {
@@ -104,26 +87,23 @@ function CreateLadderForm({ sessionId, onCreated }) {
 
   return (
     <form onSubmit={handleSubmit} className="auth-form">
+      <select value={code} onChange={(e) => setCode(e.target.value)}>
+        <option value="">Course code...</option>
+        {(codesData?.codes ?? []).map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
       <input
-        placeholder="Course code (e.g. ACCT101)"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        onBlur={lookup}
+        placeholder="Section (e.g. G3)"
+        value={section}
+        onChange={(e) => setSection(e.target.value)}
       />
-      {sections.length > 0 && (
-        <select value={courseId} onChange={(e) => pick(e.target.value)}>
-          <option value="">Pick a section...</option>
-          {sections.map((s) => (
-            <option key={s.course_id} value={s.course_id}>
-              {s.course_code} {s.section} — {s.term} ({s.opening_vacancy ?? "?"} seats)
-            </option>
-          ))}
-        </select>
-      )}
       <input
         type="number"
         min="1"
-        placeholder="Capacity (seats in Round 1)"
+        placeholder="Capacity (blank = use opening vacancy on record)"
         value={capacity}
         onChange={(e) => setCapacity(e.target.value)}
       />
@@ -225,7 +205,11 @@ function SessionPanel({ session, onDeleted }) {
 
       {ladders.map((ladder) => {
         const first = ladder[0];
-        const capacity = ladder.find((r) => r.round_index === 0)?.seats_allocated ?? 0;
+        // Legacy rounds predate the ladder and have no round_index; fall back
+        // to the largest seat count so the header never reads 0 or NaN.
+        const capacity =
+          ladder.find((r) => r.round_index === 0)?.seats_allocated ??
+          Math.max(0, ...ladder.map((r) => r.seats_allocated ?? 0));
         const filled = ladder.reduce((n, r) => n + (r.seats_filled ?? 0), 0);
         const closed = ladder.filter((r) => r.status === "closed").length;
         const allDrafts = ladder.every((r) => r.status === "draft");

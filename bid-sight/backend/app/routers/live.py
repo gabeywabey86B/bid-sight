@@ -491,7 +491,8 @@ def round_bids(round_id: str, admin_id: str = Depends(current_admin_id)):
 
 
 class LadderIn(BaseModel):
-    course_id: str = Field(min_length=1)
+    course_code: str = Field(min_length=1, max_length=32)
+    section: str = Field(min_length=1, max_length=32)
     capacity_override: int | None = Field(default=None, ge=0)
 
 
@@ -510,33 +511,50 @@ def create_ladder(
     if not sb.table("live_sessions").select("id").eq("id", session_id).limit(1).execute().data:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    course = (
+    # The section is typed by hand, so normalise before matching: the table
+    # stores "G1"/"SG82", not "g1".
+    course_code = body.course_code.strip().upper()
+    section = body.section.strip().upper()
+
+    # Most recent term wins — that's the seat count worth simulating.
+    match = (
         sb.table("bidding_table_info")
-        .select("course_code, section, description, opening_vacancy")
-        .eq("course_id", body.course_id)
+        .select("description, opening_vacancy, term")
+        .eq("course_code", course_code)
+        .eq("section", section)
+        .order("term", desc=True)
         .limit(1)
         .execute()
         .data
     )
-    if not course:
-        raise HTTPException(status_code=404, detail="Course section not found")
-    course = course[0]
+
+    if match:
+        description = match[0]["description"]
+        opening_vacancy = match[0]["opening_vacancy"] or 0
+    elif body.capacity_override:
+        # Section isn't in the historical data — allowed, but only when the
+        # admin supplies the capacity, since we can't infer it.
+        description = None
+        opening_vacancy = 0
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No record of {course_code} {section} — check the section, or set a capacity manually",
+        )
 
     capacity = (
-        body.capacity_override
-        if body.capacity_override is not None
-        else (course["opening_vacancy"] or 0)
+        body.capacity_override if body.capacity_override is not None else opening_vacancy
     )
     if capacity <= 0:
         raise HTTPException(
             status_code=400,
-            detail="This section has no opening vacancy on record — set a capacity manually",
+            detail=f"{course_code} {section} has no opening vacancy on record — set a capacity manually",
         )
 
     # ponytail: a ladder is (session_id, course_code, section) — a second ladder
     # for the same section in one session would merge into the first, so refuse.
     # Add a ladder_id column if sessions ever need to re-run a section.
-    if _ladder_rounds(sb, session_id, course["course_code"], course["section"]):
+    if _ladder_rounds(sb, session_id, course_code, section):
         raise HTTPException(
             status_code=409, detail="A ladder for this section already exists in this session"
         )
@@ -546,9 +564,9 @@ def create_ladder(
             "session_id": session_id,
             "round_index": i,
             "round_label": label,
-            "course_code": course["course_code"],
-            "section": course["section"],
-            "description": course["description"],
+            "course_code": course_code,
+            "section": section,
+            "description": description,
             "seats_allocated": capacity if i == 0 else 0,
             "status": "draft",
         }

@@ -66,6 +66,7 @@ export const api = {
   myPredictions: () => request("/predictions/me"),
   leaderboard: (limit = 20, school = null) =>
     request(`/leaderboard?limit=${limit}${school ? `&school=${encodeURIComponent(school)}` : ""}`),
+  getCourseCodes: () => request("/courses/codes"),
   searchCourses: (q, limit = 200) =>
     request(`/courses/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   checkName: (name) => request(`/profiles/check-name?name=${encodeURIComponent(name)}`),
@@ -98,10 +99,10 @@ export const api = {
   adminCloseRound: (id) =>
     request(`/live/admin/rounds/${encodeURIComponent(id)}/close`, { method: "POST" }),
   adminRoundBids: (id) => request(`/live/admin/rounds/${encodeURIComponent(id)}/bids`),
-  adminCreateLadder: (sessionId, course_id, capacity_override) =>
+  adminCreateLadder: (sessionId, course_code, section, capacity_override) =>
     request(`/live/admin/sessions/${encodeURIComponent(sessionId)}/ladder`, {
       method: "POST",
-      body: { course_id, capacity_override },
+      body: { course_code, section, capacity_override },
     }),
   adminDeleteRound: (id) =>
     request(`/live/admin/rounds/${encodeURIComponent(id)}`, { method: "DELETE" }),

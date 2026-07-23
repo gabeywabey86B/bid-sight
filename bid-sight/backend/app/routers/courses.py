@@ -13,6 +13,18 @@ from ..supabase_client import get_client
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 
+@router.get("/codes")
+def course_codes():
+    """Distinct course codes, for the admin ladder picker's dropdown.
+
+    Computed by the course_codes() DB function rather than paging the 191k-row
+    table in Python — same reasoning as training_schools().
+    """
+    sb = get_client()
+    rows = sb.rpc("course_codes").execute().data
+    return {"codes": [r["course_code"] for r in rows]}
+
+
 @router.get("/search")
 def search_courses(
     q: str = Query(..., min_length=2, max_length=20),
