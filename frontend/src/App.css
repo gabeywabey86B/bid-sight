@@ -273,6 +273,15 @@ main {
   outline-offset: 2px;
 }
 
+.auth-warning {
+  margin: var(--space-md) 0 0;
+  padding: var(--space-md);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: var(--radius-md);
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--color-destructive);
+}
+
 /* ============================================
    BUTTONS
    ============================================ */
@@ -1393,6 +1402,7 @@ tbody tr.own-row:hover {
     padding: 10px 16px;
     font-size: 0.875rem;
   }
+<<<<<<< HEAD
 
   .loading-container {
     padding: var(--space-lg);
@@ -1434,3 +1444,6 @@ tbody tr.own-row:hover {
     min-height: 48px;
   }
 }
+=======
+}
+>>>>>>> feature/google-authentication

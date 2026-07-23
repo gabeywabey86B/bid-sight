@@ -1,0 +1,241 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.section_info (
+  course_id text NOT NULL,
+  schedule text,
+  course_areas text,
+  url text,
+  CONSTRAINT section_info_pkey PRIMARY KEY (course_id)
+);
+CREATE TABLE public.bidding_table_info (
+  course_id text NOT NULL,
+  bidding_window text NOT NULL,
+  term text,
+  session_bidding_window text,
+  course_code text,
+  description text,
+  section text,
+  median_bid numeric,
+  min_bid numeric,
+  vacancy integer,
+  opening_vacancy integer,
+  before_process_vacancy integer,
+  after_process_vacancy integer,
+  dice integer,
+  enrolled_students integer,
+  instructor text,
+  school_department text,
+  url text,
+  CONSTRAINT bidding_table_info_pkey PRIMARY KEY (course_id, bidding_window),
+  CONSTRAINT fk_section FOREIGN KEY (course_id) REFERENCES public.section_info(course_id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  display_name text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  is_admin boolean NOT NULL DEFAULT false,
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.predictions (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  user_id uuid NOT NULL,
+  course_id text NOT NULL,
+  bidding_window text NOT NULL,
+  target text NOT NULL CHECK (target = ANY (ARRAY['median'::text, 'min'::text])),
+  mode text NOT NULL CHECK (mode = ANY (ARRAY['training'::text, 'live'::text])),
+  predicted_value numeric NOT NULL CHECK (predicted_value >= 0::numeric),
+  actual_value numeric,
+  error_pct numeric,
+  score numeric,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  course_code text,
+  counted boolean NOT NULL DEFAULT false,
+  school_department text,
+  CONSTRAINT predictions_pkey PRIMARY KEY (id),
+  CONSTRAINT predictions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT fk_predictions_section FOREIGN KEY (course_id) REFERENCES public.bidding_table_info(course_id),
+  CONSTRAINT fk_predictions_section FOREIGN KEY (bidding_window) REFERENCES public.bidding_table_info(bidding_window)
+);
+CREATE TABLE public.2025-2026 term1 (
+  2025-26 Term 1 text,
+  Regular Academic Session text,
+  Round 2A Window 3 text,
+  ACCT009 text,
+  Overseas Project Experience (Accounting in Asia) (SMU-X: Hong K text,
+  G1 | https://boss.intranet.smu.edu.sg/ClassDetails.aspx?Selecte text,
+  - text,
+  0 double precision,
+  25 bigint,
+  25_1 bigint,
+  0_1 bigint,
+  0_2 bigint,
+  0_3 bigint,
+  28 bigint,
+  YUANTO KUSNADI, KEVIN LEE text,
+  SOA text
+);
+CREATE TABLE public.2025-2026 term2 (
+  2025-26 Term 2 text,
+  Regular Academic Session text,
+  Round 2A Window 3 text,
+  ACCT001 text,
+  Accounting Study Mission (Asian Studies) (Thailand (Bangkok)) text,
+  G1 | https://boss.intranet.smu.edu.sg/ClassDetails.aspx?Selecte text,
+  - text,
+  0 double precision,
+  25 bigint,
+  0_1 bigint,
+  0_2 bigint,
+  0_3 bigint,
+  0_4 bigint,
+  27 bigint,
+  PRASART JONGJAROENKAMOL text,
+  SOA text
+);
+CREATE TABLE public.2024-2025 term2 (
+  2024-25 Term 2 text,
+  Regular Academic Session text,
+  Round 2A Window 3 text,
+  ACCT001 text,
+  Accounting Study Mission (Asian Studies) (Taiwan) text,
+  G1 | https://boss.intranet.smu.edu.sg/ClassDetails.aspx?Selecte text,
+  - text,
+  0 double precision,
+  29 bigint,
+  0_1 bigint,
+  0_2 bigint,
+  0_3 bigint,
+  0_4 bigint,
+  29_1 bigint,
+  CHEN CHIH-YING text,
+  SOA text
+);
+CREATE TABLE public.2024-2025 term1 (
+  2024-25 Term 1 text,
+  Regular Academic Session text,
+  Round 2A Window 3 text,
+  ACCT001 text,
+  Accounting Study Mission (Asian Studies) (Thailand (Bangkok)) text,
+  G1 | https://boss.intranet.smu.edu.sg/ClassDetails.aspx?Selecte text,
+  - text,
+  0 double precision,
+  29 bigint,
+  29_1 bigint,
+  0_1 bigint,
+  0_2 bigint,
+  0_3 bigint,
+  29_2 bigint,
+  PRASART JONGJAROENKAMOL text,
+  SOA text
+);
+CREATE TABLE public.2023-2024 term1 (
+  2023-24 Term 1 text,
+  Regular Academic Session text,
+  Round 2A Window 3 text,
+  ACCT101 text,
+  Financial Accounting text,
+  G1 | https://boss.intranet.smu.edu.sg/ClassDetails.aspx?Selecte text,
+  - text,
+  0 double precision,
+  45 bigint,
+  45_1 bigint,
+  5 bigint,
+  5_1 bigint,
+  0_1 bigint,
+  40 bigint,
+  YIN WANG text,
+  SOA text
+);
+CREATE TABLE public.2023-2024 term2 (
+  2023-24 Term 2 text,
+  Regular Academic Session text,
+  Round 2A Window 3 text,
+  ACCT001 text,
+  Accounting Study Mission (Asian Studies) (South Korea (Seoul)) text,
+  G1 | https://boss.intranet.smu.edu.sg/ClassDetails.aspx?Selecte text,
+  - text,
+  0 double precision,
+  29 bigint,
+  29_1 bigint,
+  0_1 bigint,
+  0_2 bigint,
+  0_3 bigint,
+  29_2 bigint,
+  ZANG YOONSEOK text,
+  SOA text
+);
+CREATE TABLE public.2022-2023 term2 (
+  2022-23 Term 2 text,
+  Regular Academic Session text,
+  Round 2A Window 3 text,
+  ACCT101 text,
+  Financial Accounting text,
+  G1 | https://boss.intranet.smu.edu.sg/ClassDetails.aspx?Selecte text,
+  - text,
+  0 text,
+  45 text,
+  45_1 text,
+  2 text,
+  2_1 text,
+  0_1 text,
+  43 text,
+  GRACE FAN text,
+  SOA text
+);
+CREATE TABLE public.2022-2023 term1 (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT 2022-2023 term1_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.friends (
+  user_id uuid NOT NULL,
+  friend_id uuid NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT friends_pkey PRIMARY KEY (user_id, friend_id),
+  CONSTRAINT friends_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT friends_friend_id_fkey FOREIGN KEY (friend_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.live_sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  created_by uuid,
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'archived'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT live_sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT live_sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.live_rounds (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  session_id uuid,
+  round_label text NOT NULL,
+  course_code text NOT NULL,
+  section text NOT NULL,
+  description text,
+  starts_at timestamp with time zone,
+  ends_at timestamp with time zone,
+  seats_allocated integer NOT NULL CHECK (seats_allocated >= 0),
+  status text NOT NULL DEFAULT 'draft'::text CHECK (status = ANY (ARRAY['draft'::text, 'open'::text, 'closed'::text])),
+  clearing_price numeric,
+  seats_filled integer,
+  bid_count integer,
+  avg_bid numeric,
+  min_bid numeric,
+  max_bid numeric,
+  median_bid numeric,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT live_rounds_pkey PRIMARY KEY (id),
+  CONSTRAINT live_rounds_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.live_sessions(id)
+);
+CREATE TABLE public.live_bids (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  round_id uuid,
+  user_id uuid,
+  amount numeric NOT NULL CHECK (amount > 0::numeric),
+  is_winner boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT live_bids_pkey PRIMARY KEY (id),
+  CONSTRAINT live_bids_round_id_fkey FOREIGN KEY (round_id) REFERENCES public.live_rounds(id),
+  CONSTRAINT live_bids_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
