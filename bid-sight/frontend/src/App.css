@@ -13,6 +13,8 @@
   --color-foreground: #0F172A;
   --color-muted: #F1F5FD;
   --color-border: #CBD5E1;
+  --text-muted: #5B6B84;
+  --table-header-bg: #BFE7FF;
   --color-destructive: #DC2626;
   --color-success: #22C55E;
   --color-warning: #F59E0B;
@@ -23,8 +25,13 @@
   --color-bg-dark: #0F1419;
   --color-surface-dark: #1A1F2E;
   --color-foreground-dark: #F5F5F5;
-  --color-muted-dark: #9CA3AF;
+  /* --color-muted is a FILL, never a text color. The dark value used to be
+     #9CA3AF (a text gray), which turned every table header, hover row and pill
+     into a light-gray block in dark mode. Text muting lives in --text-muted. */
+  --color-muted-dark: #232A3A;
   --color-border-dark: #2D3748;
+  --text-muted-dark: #9CA3AF;
+  --table-header-bg-dark: #1E3A5F;
 
   /* Typography */
   --font-display: 'Jost', system-ui, -apple-system, sans-serif;
@@ -71,6 +78,8 @@
     --color-muted: var(--color-muted-dark);
     --color-border: var(--color-border-dark);
     --color-primary: #60A5FA;
+    --text-muted: var(--text-muted-dark);
+    --table-header-bg: var(--table-header-bg-dark);
   }
 }
 
@@ -82,6 +91,8 @@
   --color-muted: var(--color-muted-dark);
   --color-border: var(--color-border-dark);
   --color-primary: #60A5FA;
+  --text-muted: var(--text-muted-dark);
+  --table-header-bg: var(--table-header-bg-dark);
 }
 
 /* Explicit light theme via data-theme attribute */
@@ -92,6 +103,8 @@
   --color-muted: #F1F5FD;
   --color-border: #CBD5E1;
   --color-primary: #2563EB;
+  --text-muted: #5B6B84;
+  --table-header-bg: #BFE7FF;
 }
 
 /* ============================================
@@ -180,25 +193,30 @@ a:hover {
    ============================================ */
 
 .app-shell {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 clamp(16px, 4vw, 48px) var(--space-3xl);
+  display: flex;
+  flex-direction: column;
 }
 
 main {
   min-height: calc(100vh - 200px);
-  padding-top: var(--space-md);
+}
+
+/* Content column. Matches .navbar-inner so the nav row lines up with the page. */
+.page-container {
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: var(--space-lg) clamp(16px, 3vw, 40px) var(--space-3xl);
 }
 
 /* ============================================
    NAVBAR / NAVIGATION
    ============================================ */
 
+/* Full-bleed bar: background and border reach both screen edges, while the row
+   inside is capped to the same width as .page-container so the two align. */
 .navbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
+  padding: 0;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
   backdrop-filter: blur(10px);
@@ -206,14 +224,24 @@ main {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: var(--shadow-sm);
+}
+
+.navbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 1680px;
+  height: 56px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 3vw, 40px);
 }
 
 .navbar .brand {
-  font-size: 1.125rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  margin-right: auto;
+  margin-right: var(--space-md);
   color: var(--color-foreground);
   text-decoration: none;
   transition: color var(--duration-fast) var(--ease-standard);
@@ -228,15 +256,16 @@ main {
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
   transition: all var(--duration-fast) var(--ease-standard);
   position: relative;
 }
 
+/* Fill only — no colour shift. The active page is the only coloured item. */
 .navbar a:hover {
   background: var(--color-muted);
-  color: var(--color-primary);
 }
 
 .navbar a:focus {
@@ -255,11 +284,11 @@ main {
   border: none;
   color: var(--color-foreground);
   cursor: pointer;
-  padding: var(--space-xs) var(--space-sm);
+  padding: 6px 10px;
   font: inherit;
   font-size: 0.875rem;
   font-weight: 500;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   transition: all var(--duration-fast) var(--ease-standard);
 }
 
@@ -530,16 +559,8 @@ table {
 }
 
 thead {
-  background: var(--color-muted);
+  background: var(--table-header-bg);
   border-bottom: 2px solid var(--color-border);
-}
-
-:root[data-theme="light"] thead {
-  background: #BFE7FF;
-}
-
-:root[data-theme="dark"] thead {
-  background: var(--color-muted);
 }
 
 th {
@@ -625,7 +646,7 @@ tbody tr.own-row:hover {
   padding: 12px 16px;
   border-bottom: 2px solid var(--color-border);
   white-space: nowrap;
-  background: var(--color-muted);
+  background: var(--table-header-bg);
 }
 
 .history-table td {
@@ -688,7 +709,7 @@ tbody tr.own-row:hover {
 }
 
 .round-card .meta {
-  color: var(--color-muted);
+  color: var(--text-muted);
   font-size: 0.875rem;
   margin: 4px 0;
 }
@@ -888,6 +909,29 @@ tbody tr.own-row:hover {
 
 .friend-row:last-child {
   border-bottom: none;
+}
+
+/* Autocomplete anchor. The dropdown itself reuses .multiselect-menu. */
+.friend-search {
+  position: relative;
+  max-width: 420px;
+  margin-bottom: var(--space-lg);
+}
+
+/* Override .search-form's 320px cap so the dropdown lines up with the input. */
+.friend-search input {
+  max-width: none;
+}
+
+.friend-suggestions {
+  left: 0;
+  right: 0;
+  padding: 0;
+  gap: 0;
+}
+
+.friend-suggestions .meta {
+  padding: 14px 20px;
 }
 
 /* ============================================
@@ -1131,21 +1175,28 @@ tbody tr.own-row:hover {
   background: none;
   border: none;
   cursor: pointer;
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
+  padding: 0;
+  border-radius: var(--radius-md);
   transition: all var(--duration-fast) var(--ease-standard);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  margin-right: var(--space-sm);
+  min-width: 32px;
+  min-height: 32px;
   color: var(--color-foreground);
 }
 
+/* Touch devices still get a 44px target. */
+@media (pointer: coarse) {
+  .theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .theme-toggle svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1153,7 +1204,6 @@ tbody tr.own-row:hover {
 
 .theme-toggle:hover {
   background: var(--color-muted);
-  transform: scale(1.1);
 }
 
 .theme-toggle:focus {
@@ -1307,14 +1357,19 @@ tbody tr.own-row:hover {
    ============================================ */
 
 @media (max-width: 768px) {
-  .navbar {
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
+  /* Eight nav items don't fit a phone — scroll the row instead of shrinking it. */
+  .navbar-inner {
+    padding: 0 var(--space-md);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .navbar-inner::-webkit-scrollbar {
+    display: none;
   }
 
   .navbar a {
-    font-size: 0.8125rem;
-    padding: var(--space-xs) 6px;
+    padding: 6px 8px;
   }
 
   th, td {
@@ -1345,35 +1400,13 @@ tbody tr.own-row:hover {
 }
 
 @media (max-width: 480px) {
-  .app-shell {
-    padding: 0 var(--space-md) var(--space-2xl);
-  }
-
-  .navbar {
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
+  .page-container {
+    padding: var(--space-md) var(--space-md) var(--space-2xl);
   }
 
   .navbar .brand {
-    font-size: 1rem;
-  }
-
-  .navbar a {
-    font-size: 0.75rem;
-    padding: var(--space-xs) 4px;
-  }
-
-  .theme-toggle {
-    font-size: 1.1rem;
-    padding: var(--space-xs) 6px;
-    min-width: 40px;
-    min-height: 40px;
-    margin-right: var(--space-xs);
-  }
-
-  .link-button {
-    font-size: 0.75rem;
-    padding: var(--space-xs) 4px;
+    font-size: 0.875rem;
+    margin-right: var(--space-sm);
   }
 
   h1 {
@@ -1421,26 +1454,3 @@ tbody tr.own-row:hover {
   }
 }
 
-/* Desktop 1920x1080 optimizations */
-@media (min-width: 1920px) {
-  .app-shell {
-    max-width: 1920px;
-    margin: 0 auto;
-  }
-
-  .navbar {
-    padding: var(--space-lg) var(--space-3xl);
-    gap: var(--space-md);
-  }
-
-  .navbar a {
-    font-size: 0.9375rem;
-    padding: var(--space-sm) var(--space-md);
-  }
-
-  .theme-toggle {
-    font-size: 1.375rem;
-    min-width: 48px;
-    min-height: 48px;
-  }
-}

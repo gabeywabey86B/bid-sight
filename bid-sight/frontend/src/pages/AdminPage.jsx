@@ -2,14 +2,19 @@ import { useState } from "react";
 import { api } from "../lib/api";
 import { useApi } from "../lib/useApi";
 
-function RoundRow({ round, onOpen, onClose, onSelect, selected }) {
+function RoundRow({ round, onOpen, onClose, onDelete, onSelect, selected }) {
+  // Later windows are placeholders until they open — their seat count only
+  // becomes real once every earlier window has cleared.
+  const seats =
+    round.status === "draft" && round.round_index > 0 ? "—" : round.seats_allocated;
   return (
     <tr className={selected ? "own-row" : ""}>
+      <td className="num-col">{round.round_index === null ? "" : round.round_index + 1}</td>
       <td>{round.round_label}</td>
-      <td>
-        {round.course_code} {round.section}
+      <td className="num-col">{seats}</td>
+      <td className="num-col">
+        {round.status === "closed" ? `${round.seats_filled ?? 0}` : ""}
       </td>
-      <td className="num-col">{round.seats_allocated}</td>
       <td>
         <span className={`status-pill status-${round.status}`}>{round.status}</span>
       </td>
@@ -24,64 +29,71 @@ function RoundRow({ round, onOpen, onClose, onSelect, selected }) {
             Close
           </button>
         )}
-        <button className="link-button" onClick={() => onSelect(round.id)} style={{ marginLeft: 12 }}>
+        <button className="link-button" onClick={() => onSelect(round.id)}>
           View bids
         </button>
+        {round.status === "draft" && (
+          <button className="link-button" onClick={() => onDelete(round.id)}>
+            Delete
+          </button>
+        )}
       </td>
     </tr>
   );
 }
 
-function CreateRoundForm({ sessionId, onCreated }) {
-  const [form, setForm] = useState({
-    round_label: "",
-    course_code: "",
-    section: "",
-    description: "",
-    starts_at: "",
-    ends_at: "",
-    seats_allocated: "",
-  });
+// Pick a real section, then generate the whole 12-window BOSS ladder from it.
+// Reuses /courses/search, which already returns opening_vacancy per section.
+function CreateLadderForm({ sessionId, onCreated }) {
+  const [code, setCode] = useState("");
+  const [sections, setSections] = useState([]);
+  const [courseId, setCourseId] = useState("");
+  const [capacity, setCapacity] = useState("");
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  function update(key, value) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  async function lookup() {
+    const q = code.trim();
+    if (q.length < 2) return;
+    setError(null);
+    try {
+      const { results } = await api.searchCourses(q);
+      // One row per (course_id, bidding_window) comes back; a section is a
+      // course_id, so collapse to the first row for each.
+      const seen = new Map();
+      for (const r of results) if (!seen.has(r.course_id)) seen.set(r.course_id, r);
+      setSections([...seen.values()]);
+      if (seen.size === 0) setError("No sections found for that course code.");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
-  async function prefillSeats() {
-    if (!form.course_code || !form.section) return;
-    try {
-      const { remaining } = await api.adminSeatsRemaining(form.course_code, form.section);
-      update("seats_allocated", String(remaining));
-    } catch {
-      // ignore — admin can just type the number
-    }
+  function pick(id) {
+    setCourseId(id);
+    const s = sections.find((x) => x.course_id === id);
+    setCapacity(s?.opening_vacancy != null ? String(s.opening_vacancy) : "");
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!courseId) {
+      setError("Pick a section first.");
+      return;
+    }
+    const cap = Number(capacity);
+    if (!Number.isInteger(cap) || cap <= 0) {
+      setError("Capacity must be a positive whole number.");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
-      await api.adminCreateRound(sessionId, {
-        round_label: form.round_label,
-        course_code: form.course_code,
-        section: form.section,
-        description: form.description || null,
-        starts_at: form.starts_at || null,
-        ends_at: form.ends_at || null,
-        seats_allocated: Number(form.seats_allocated),
-      });
-      setForm({
-        round_label: "",
-        course_code: "",
-        section: "",
-        description: "",
-        starts_at: "",
-        ends_at: "",
-        seats_allocated: "",
-      });
+      await api.adminCreateLadder(sessionId, courseId, cap);
+      setCode("");
+      setSections([]);
+      setCourseId("");
+      setCapacity("");
       onCreated();
     } catch (err) {
       setError(err.message);
@@ -93,57 +105,31 @@ function CreateRoundForm({ sessionId, onCreated }) {
   return (
     <form onSubmit={handleSubmit} className="auth-form">
       <input
-        placeholder="Round label (e.g. Round 1)"
-        value={form.round_label}
-        onChange={(e) => update("round_label", e.target.value)}
-        required
+        placeholder="Course code (e.g. ACCT101)"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        onBlur={lookup}
       />
-      <input
-        placeholder="Course code"
-        value={form.course_code}
-        onChange={(e) => update("course_code", e.target.value)}
-        onBlur={prefillSeats}
-        required
-      />
-      <input
-        placeholder="Section"
-        value={form.section}
-        onChange={(e) => update("section", e.target.value)}
-        onBlur={prefillSeats}
-        required
-      />
-      <input
-        placeholder="Description"
-        value={form.description}
-        onChange={(e) => update("description", e.target.value)}
-      />
-      <label className="meta">
-        Starts at
-        <input
-          type="datetime-local"
-          value={form.starts_at}
-          onChange={(e) => update("starts_at", e.target.value)}
-        />
-      </label>
-      <label className="meta">
-        Ends at (blank = manual close only)
-        <input
-          type="datetime-local"
-          value={form.ends_at}
-          onChange={(e) => update("ends_at", e.target.value)}
-        />
-      </label>
+      {sections.length > 0 && (
+        <select value={courseId} onChange={(e) => pick(e.target.value)}>
+          <option value="">Pick a section...</option>
+          {sections.map((s) => (
+            <option key={s.course_id} value={s.course_id}>
+              {s.course_code} {s.section} — {s.term} ({s.opening_vacancy ?? "?"} seats)
+            </option>
+          ))}
+        </select>
+      )}
       <input
         type="number"
-        min="0"
-        placeholder="Seats allocated"
-        value={form.seats_allocated}
-        onChange={(e) => update("seats_allocated", e.target.value)}
-        required
+        min="1"
+        placeholder="Capacity (seats in Round 1)"
+        value={capacity}
+        onChange={(e) => setCapacity(e.target.value)}
       />
       {error && <p className="error">{error}</p>}
       <button type="submit" className="btn-primary" disabled={submitting}>
-        {submitting ? "..." : "Create round"}
+        {submitting ? "..." : "Generate 12-window ladder"}
       </button>
     </form>
   );
@@ -178,62 +164,125 @@ function BidsTable({ roundId }) {
   );
 }
 
-function SessionPanel({ session }) {
+// A ladder is every round sharing course_code + section — the same grouping
+// the backend uses to carry seats forward.
+function groupLadders(rounds) {
+  const groups = new Map();
+  for (const r of rounds) {
+    const key = `${r.course_code}|${r.section}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  return [...groups.values()];
+}
+
+function SessionPanel({ session, onDeleted }) {
   const { data, refetch } = useApi(() => api.adminListRounds(session.id), { intervalMs: 5000 });
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   const [actionError, setActionError] = useState(null);
 
-  async function handleOpen(roundId) {
+  // Every admin action is the same shape: call, refetch, surface the error.
+  async function run(fn) {
     setActionError(null);
     try {
-      await api.adminOpenRound(roundId);
+      await fn();
       refetch();
     } catch (err) {
       setActionError(err.message);
     }
   }
 
-  async function handleClose(roundId) {
+  async function handleDeleteSession() {
+    if (!confirm(`Delete session "${session.name}" and everything in it?`)) return;
     setActionError(null);
     try {
-      await api.adminCloseRound(roundId);
-      refetch();
+      await api.adminDeleteSession(session.id);
+      onDeleted();
     } catch (err) {
+      // The backend refuses when real bids exist; ask once, then force.
+      if (err.message.includes("force=true") && confirm(`${err.message}\n\nDelete anyway?`)) {
+        await api.adminDeleteSession(session.id, true);
+        onDeleted();
+        return;
+      }
       setActionError(err.message);
     }
   }
+
+  const ladders = groupLadders(data?.rounds ?? []);
 
   return (
     <div className="round-card">
-      <h3>{session.name}</h3>
-      <CreateRoundForm sessionId={session.id} onCreated={refetch} />
+      <div className="history-header">
+        <h3>{session.name}</h3>
+        <button className="link-button" onClick={handleDeleteSession}>
+          Delete session
+        </button>
+      </div>
+
+      <CreateLadderForm sessionId={session.id} onCreated={refetch} />
       {actionError && <p className="error">{actionError}</p>}
 
-      {data?.rounds.length > 0 && (
-        <table className="history-table">
-          <thead>
-            <tr>
-              <th>Round</th>
-              <th>Course</th>
-              <th>Seats</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.rounds.map((r) => (
-              <RoundRow
-                key={r.id}
-                round={r}
-                onOpen={handleOpen}
-                onClose={handleClose}
-                onSelect={setSelectedRoundId}
-                selected={selectedRoundId === r.id}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
+      {ladders.map((ladder) => {
+        const first = ladder[0];
+        const capacity = ladder.find((r) => r.round_index === 0)?.seats_allocated ?? 0;
+        const filled = ladder.reduce((n, r) => n + (r.seats_filled ?? 0), 0);
+        const closed = ladder.filter((r) => r.status === "closed").length;
+        const allDrafts = ladder.every((r) => r.status === "draft");
+        return (
+          <div key={`${first.course_code}|${first.section}`} className="history">
+            <div className="history-header">
+              <h4>
+                {first.course_code} {first.section} — {capacity} seats
+              </h4>
+              {allDrafts && (
+                <button
+                  className="link-button"
+                  onClick={() =>
+                    confirm(`Delete the ${first.course_code} ${first.section} ladder?`) &&
+                    run(() =>
+                      api.adminDeleteLadder(session.id, first.course_code, first.section)
+                    )
+                  }
+                >
+                  Delete ladder
+                </button>
+              )}
+            </div>
+            <p className="meta">
+              Seats filled {filled} / {capacity} · {closed} of {ladder.length} windows closed
+            </p>
+            <table className="history-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Round</th>
+                  <th>Seats</th>
+                  <th>Filled</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {ladder.map((r) => (
+                  <RoundRow
+                    key={r.id}
+                    round={r}
+                    onOpen={(id) => run(() => api.adminOpenRound(id))}
+                    onClose={(id) => run(() => api.adminCloseRound(id))}
+                    onDelete={(id) =>
+                      confirm(`Delete ${r.round_label}?`) &&
+                      run(() => api.adminDeleteRound(id))
+                    }
+                    onSelect={setSelectedRoundId}
+                    selected={selectedRoundId === r.id}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
 
       {selectedRoundId && (
         <div className="history">
@@ -291,7 +340,7 @@ export default function AdminPage() {
       {!data && <p className="meta">Loading sessions...</p>}
       {data?.sessions.length === 0 && <p className="meta">No sessions yet.</p>}
       {data?.sessions.map((s) => (
-        <SessionPanel key={s.id} session={s} />
+        <SessionPanel key={s.id} session={s} onDeleted={refetch} />
       ))}
     </div>
   );

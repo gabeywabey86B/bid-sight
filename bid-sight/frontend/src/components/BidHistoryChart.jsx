@@ -106,11 +106,11 @@ export default function BidHistoryChart({ rows, target }) {
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" />
-            <XAxis dataKey="term" tick={{ fontSize: 12 }} stroke="var(--muted)" />
+            <CartesianGrid strokeDasharray="4 4" stroke="var(--color-border)" />
+            <XAxis dataKey="term" tick={{ fontSize: 12 }} stroke="var(--text-muted)" />
             <YAxis
               tick={{ fontSize: 12 }}
-              stroke="var(--muted)"
+              stroke="var(--text-muted)"
               label={{ value: "bid (e$)", angle: -90, position: "insideLeft", fontSize: 12 }}
             />
             <Tooltip />

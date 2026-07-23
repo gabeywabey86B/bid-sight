@@ -37,7 +37,7 @@
 
   font: 16px/155% var(--sans);
   letter-spacing: -0.006em;
-  color-scheme: light;
+  color-scheme: light dark;
   color: var(--ink);
   background: var(--bg);
   font-synthesis: none;

@@ -33,21 +33,21 @@ export default function ScoreChart({ points }) {
     <div className="chart-block">
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" />
-          <XAxis dataKey="attempt" tick={{ fontSize: 12 }} stroke="var(--muted)" />
+          <CartesianGrid strokeDasharray="4 4" stroke="var(--color-border)" />
+          <XAxis dataKey="attempt" tick={{ fontSize: 12 }} stroke="var(--text-muted)" />
           <YAxis
             domain={[0, 1]}
             tick={{ fontSize: 12 }}
-            stroke="var(--muted)"
+            stroke="var(--text-muted)"
             label={{ value: "score", angle: -90, position: "insideLeft", fontSize: 12 }}
           />
-          <ReferenceLine y={0.5} stroke="var(--border)" strokeDasharray="4 4" />
+          <ReferenceLine y={0.5} stroke="var(--color-border)" strokeDasharray="4 4" />
           <Tooltip content={<ChartTooltip />} />
           <Line
             type="monotone"
             dataKey="score"
             name="Score"
-            stroke="var(--muted)"
+            stroke="var(--text-muted)"
             strokeWidth={1.5}
             strokeDasharray="3 3"
             dot={false}
@@ -56,7 +56,7 @@ export default function ScoreChart({ points }) {
             type="monotone"
             dataKey="rolling"
             name="Rolling avg"
-            stroke={trendingUp ? "var(--accent)" : "var(--muted)"}
+            stroke={trendingUp ? "var(--accent)" : "var(--text-muted)"}
             strokeWidth={2.5}
             dot={false}
           />

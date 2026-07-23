@@ -98,8 +98,20 @@ export const api = {
   adminCloseRound: (id) =>
     request(`/live/admin/rounds/${encodeURIComponent(id)}/close`, { method: "POST" }),
   adminRoundBids: (id) => request(`/live/admin/rounds/${encodeURIComponent(id)}/bids`),
-  adminSeatsRemaining: (courseCode, section) =>
+  adminCreateLadder: (sessionId, course_id, capacity_override) =>
+    request(`/live/admin/sessions/${encodeURIComponent(sessionId)}/ladder`, {
+      method: "POST",
+      body: { course_id, capacity_override },
+    }),
+  adminDeleteRound: (id) =>
+    request(`/live/admin/rounds/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminDeleteLadder: (sessionId, courseCode, section) =>
     request(
-      `/live/admin/seats-remaining?course_code=${encodeURIComponent(courseCode)}&section=${encodeURIComponent(section)}`
+      `/live/admin/sessions/${encodeURIComponent(sessionId)}/ladder?course_code=${encodeURIComponent(courseCode)}&section=${encodeURIComponent(section)}`,
+      { method: "DELETE" }
     ),
+  adminDeleteSession: (id, force = false) =>
+    request(`/live/admin/sessions/${encodeURIComponent(id)}?force=${force}`, {
+      method: "DELETE",
+    }),
 };

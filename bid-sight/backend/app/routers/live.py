@@ -6,20 +6,68 @@ that touches it, rather than by a background scheduler.
 """
 from __future__ import annotations
 
+import logging
 import statistics
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..auth import current_admin_id, current_user_id
 from ..supabase_client import get_client
 
 router = APIRouter(prefix="/live", tags=["live"])
+logger = logging.getLogger(__name__)
+
+# The real BOSS window sequence for a Regular Academic Session, verified
+# against the term exports in supabase_sql/.
+BOSS_WINDOWS = [
+    "Round 1 Window 1",
+    "Round 1A Window 1",
+    "Round 1A Window 2",
+    "Round 1A Window 3",
+    "Round 1B Window 1",
+    "Round 1B Window 2",
+    "Round 2 Window 1",
+    "Round 2 Window 2",
+    "Round 2 Window 3",
+    "Round 2A Window 1",
+    "Round 2A Window 2",
+    "Round 2A Window 3",
+]
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _uuid_or_400(value: str, field: str) -> str:
+    """Path params are typed str, so FastAPI does not validate them; without
+    this a malformed id reaches PostgREST and comes back as a 500."""
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=400, detail=f"Invalid {field}")
+
+
+def _remaining_seats(capacity: int, closed_rounds: list[dict]) -> int:
+    """Seats available in the next window = capacity minus everything already
+    filled. seats_filled is null on rounds that closed with no bids."""
+    return max(capacity - sum(r["seats_filled"] or 0 for r in closed_rounds), 0)
+
+
+def _ladder_rounds(sb, session_id: str, course_code: str, section: str) -> list[dict]:
+    return (
+        sb.table("live_rounds")
+        .select("id, round_index, status, seats_allocated, seats_filled")
+        .eq("session_id", session_id)
+        .eq("course_code", course_code)
+        .eq("section", section)
+        .order("round_index")
+        .execute()
+        .data
+    )
 
 
 def _close_round(sb, round_id: str) -> None:
@@ -297,12 +345,14 @@ def list_sessions(admin_id: str = Depends(current_admin_id)):
 
 @router.get("/admin/sessions/{session_id}/rounds")
 def list_rounds(session_id: str, admin_id: str = Depends(current_admin_id)):
+    session_id = _uuid_or_400(session_id, "session_id")
     sb = get_client()
     _auto_close_expired(sb)
     rows = (
         sb.table("live_rounds")
         .select("*")
         .eq("session_id", session_id)
+        .order("round_index", desc=False)
         .order("created_at", desc=False)
         .execute()
         .data
@@ -334,16 +384,26 @@ def create_round(session_id: str, body: RoundIn, admin_id: str = Depends(current
 
 @router.post("/admin/rounds/{round_id}/open")
 def open_round(round_id: str, admin_id: str = Depends(current_admin_id)):
+    round_id = _uuid_or_400(round_id, "round_id")
     sb = get_client()
-    rows = sb.table("live_rounds").select("session_id").eq("id", round_id).limit(1).execute().data
+    rows = (
+        sb.table("live_rounds")
+        .select("session_id, course_code, section, round_index, status")
+        .eq("id", round_id)
+        .limit(1)
+        .execute()
+        .data
+    )
     if not rows:
         raise HTTPException(status_code=404, detail="Round not found")
-    session_id = rows[0]["session_id"]
+    r = rows[0]
+    if r["status"] != "draft":
+        raise HTTPException(status_code=409, detail=f"Round is already {r['status']}")
 
     other_open = (
         sb.table("live_rounds")
         .select("id")
-        .eq("session_id", session_id)
+        .eq("session_id", r["session_id"])
         .eq("status", "open")
         .neq("id", round_id)
         .limit(1)
@@ -355,14 +415,39 @@ def open_round(round_id: str, admin_id: str = Depends(current_admin_id)):
             status_code=400, detail="Another round in this session is already open"
         )
 
-    updated = (
-        sb.table("live_rounds").update({"status": "open"}).eq("id", round_id).execute().data
-    )
+    updates: dict = {"status": "open"}
+
+    # Ladder rounds carry seats forward: what's left is only knowable now, once
+    # every earlier window has closed. Rounds created outside a ladder keep the
+    # seat count they were created with.
+    if r["round_index"] is not None:
+        ladder = _ladder_rounds(sb, r["session_id"], r["course_code"], r["section"])
+        first = next((x for x in ladder if x["round_index"] == 0), None)
+        if first is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Ladder is missing its first round, so capacity is unknown",
+            )
+        capacity = first["seats_allocated"]
+        remaining = _remaining_seats(capacity, [x for x in ladder if x["status"] == "closed"])
+        logger.warning(
+            "resolving ladder seats admin=%s round=%s capacity=%s remaining=%s",
+            admin_id,
+            round_id,
+            capacity,
+            remaining,
+        )
+        if remaining == 0:
+            raise HTTPException(status_code=400, detail="No seats remaining in this ladder")
+        updates["seats_allocated"] = remaining
+
+    updated = sb.table("live_rounds").update(updates).eq("id", round_id).execute().data
     return updated[0]
 
 
 @router.post("/admin/rounds/{round_id}/close")
 def close_round(round_id: str, admin_id: str = Depends(current_admin_id)):
+    round_id = _uuid_or_400(round_id, "round_id")
     sb = get_client()
     _close_round(sb, round_id)
     updated = sb.table("live_rounds").select("*").eq("id", round_id).limit(1).execute().data
@@ -373,6 +458,7 @@ def close_round(round_id: str, admin_id: str = Depends(current_admin_id)):
 
 @router.get("/admin/rounds/{round_id}/bids")
 def round_bids(round_id: str, admin_id: str = Depends(current_admin_id)):
+    round_id = _uuid_or_400(round_id, "round_id")
     sb = get_client()
     bids = (
         sb.table("live_bids")
@@ -404,20 +490,181 @@ def round_bids(round_id: str, admin_id: str = Depends(current_admin_id)):
     }
 
 
-@router.get("/admin/seats-remaining")
-def seats_remaining(
-    course_code: str, section: str, admin_id: str = Depends(current_admin_id)
+class LadderIn(BaseModel):
+    course_id: str = Field(min_length=1)
+    capacity_override: int | None = Field(default=None, ge=0)
+
+
+@router.post("/admin/sessions/{session_id}/ladder")
+def create_ladder(
+    session_id: str, body: LadderIn, admin_id: str = Depends(current_admin_id)
 ):
+    """Generate the full 12-window BOSS ladder for one course section.
+
+    Only the first window gets real seats; every later window is a placeholder
+    resolved by open_round once the preceding windows have cleared.
+    """
+    session_id = _uuid_or_400(session_id, "session_id")
     sb = get_client()
-    rows = (
-        sb.table("live_rounds")
-        .select("seats_allocated, seats_filled")
-        .eq("course_code", course_code)
-        .eq("section", section)
-        .eq("status", "closed")
+
+    if not sb.table("live_sessions").select("id").eq("id", session_id).limit(1).execute().data:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    course = (
+        sb.table("bidding_table_info")
+        .select("course_code, section, description, opening_vacancy")
+        .eq("course_id", body.course_id)
+        .limit(1)
         .execute()
         .data
     )
-    allocated = sum(r["seats_allocated"] or 0 for r in rows)
-    filled = sum(r["seats_filled"] or 0 for r in rows)
-    return {"remaining": max(allocated - filled, 0)}
+    if not course:
+        raise HTTPException(status_code=404, detail="Course section not found")
+    course = course[0]
+
+    capacity = (
+        body.capacity_override
+        if body.capacity_override is not None
+        else (course["opening_vacancy"] or 0)
+    )
+    if capacity <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="This section has no opening vacancy on record — set a capacity manually",
+        )
+
+    # ponytail: a ladder is (session_id, course_code, section) — a second ladder
+    # for the same section in one session would merge into the first, so refuse.
+    # Add a ladder_id column if sessions ever need to re-run a section.
+    if _ladder_rounds(sb, session_id, course["course_code"], course["section"]):
+        raise HTTPException(
+            status_code=409, detail="A ladder for this section already exists in this session"
+        )
+
+    rows = [
+        {
+            "session_id": session_id,
+            "round_index": i,
+            "round_label": label,
+            "course_code": course["course_code"],
+            "section": course["section"],
+            "description": course["description"],
+            "seats_allocated": capacity if i == 0 else 0,
+            "status": "draft",
+        }
+        for i, label in enumerate(BOSS_WINDOWS)
+    ]
+    created = sb.table("live_rounds").insert(rows).execute().data
+    return {"rounds": created, "capacity": capacity}
+
+
+@router.delete("/admin/rounds/{round_id}")
+def delete_round(round_id: str, admin_id: str = Depends(current_admin_id)):
+    round_id = _uuid_or_400(round_id, "round_id")
+    sb = get_client()
+
+    rows = (
+        sb.table("live_rounds").select("id, status").eq("id", round_id).limit(1).execute().data
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Round not found")
+    if rows[0]["status"] != "draft":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Only draft rounds can be deleted — this one is {rows[0]['status']}",
+        )
+
+    # Independent of the status check: a draft should never have bids, so if it
+    # does, the status is lying and the delete would destroy real bids.
+    bids = sb.table("live_bids").select("id").eq("round_id", round_id).limit(1).execute().data
+    if bids:
+        raise HTTPException(status_code=409, detail="Round has bids and cannot be deleted")
+
+    logger.warning("deleting draft round admin=%s round=%s", admin_id, round_id)
+    sb.table("live_rounds").delete().eq("id", round_id).execute()
+    return {"deleted": round_id}
+
+
+@router.delete("/admin/sessions/{session_id}/ladder")
+def delete_ladder(
+    session_id: str,
+    course_code: str = Query(..., min_length=1),
+    section: str = Query(..., min_length=1),
+    admin_id: str = Depends(current_admin_id),
+):
+    session_id = _uuid_or_400(session_id, "session_id")
+    sb = get_client()
+
+    ladder = _ladder_rounds(sb, session_id, course_code, section)
+    if not ladder:
+        raise HTTPException(status_code=404, detail="Ladder not found")
+
+    non_draft = [r for r in ladder if r["status"] != "draft"]
+    if non_draft:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{len(non_draft)} round(s) are open or closed — delete the session instead",
+        )
+
+    logger.warning(
+        "deleting ladder admin=%s session=%s course=%s %s rounds=%s",
+        admin_id,
+        session_id,
+        course_code,
+        section,
+        len(ladder),
+    )
+    sb.table("live_rounds").delete().in_("id", [r["id"] for r in ladder]).execute()
+    return {"deleted": len(ladder)}
+
+
+@router.delete("/admin/sessions/{session_id}")
+def delete_session(
+    session_id: str,
+    force: bool = Query(False),
+    admin_id: str = Depends(current_admin_id),
+):
+    """Cascades to every round and bid beneath the session (migration 005)."""
+    session_id = _uuid_or_400(session_id, "session_id")
+    sb = get_client()
+
+    if not sb.table("live_sessions").select("id").eq("id", session_id).limit(1).execute().data:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    rounds = (
+        sb.table("live_rounds")
+        .select("id, status")
+        .eq("session_id", session_id)
+        .execute()
+        .data
+    )
+    if any(r["status"] == "open" for r in rounds):
+        raise HTTPException(
+            status_code=409, detail="Close the open round before deleting this session"
+        )
+
+    bid_count = 0
+    if rounds:
+        bid_count = len(
+            sb.table("live_bids")
+            .select("id")
+            .in_("round_id", [r["id"] for r in rounds])
+            .execute()
+            .data
+        )
+    if bid_count and not force:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Session holds {bid_count} real bid(s) — re-send with force=true to delete",
+        )
+
+    logger.warning(
+        "deleting session admin=%s session=%s rounds=%s bids=%s force=%s",
+        admin_id,
+        session_id,
+        len(rounds),
+        bid_count,
+        force,
+    )
+    sb.table("live_sessions").delete().eq("id", session_id).execute()
+    return {"deleted": session_id, "rounds": len(rounds), "bids": bid_count}
