@@ -418,6 +418,42 @@ This ensures only recent bidding data is served to users. Adjust as new terms be
 
 ---
 
+## Deployment (Hosting)
+
+**Stack:** Frontend on **Vercel**, backend on **Railway**, database/auth on **Supabase** (already set up in Step 2/3 above).
+
+### Backend → Railway
+
+1. Create a new Railway project, deploy from the GitHub repo, and set the service's **root directory** to `backend/`.
+2. Railway auto-detects `backend/Procfile`:
+   ```
+   web: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+   ```
+   No changes needed — it binds to Railway's dynamic `$PORT`.
+3. Set environment variables on the Railway service (Settings → Variables):
+   ```
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
+   FRONTEND_ORIGIN=https://your-app.vercel.app   # set after the Vercel deploy exists, see step 3 below
+   SCORING_K=5.0                                  # optional
+   ```
+4. Deploy, then note the generated Railway URL (e.g. `https://your-backend.up.railway.app`) — the frontend needs it as `VITE_API_URL`.
+
+### Frontend → Vercel
+
+1. Import the repo into Vercel and set the project's **root directory** to `frontend/`.
+2. Set environment variables (Project → Settings → Environment Variables):
+   ```
+   VITE_API_URL=https://your-backend.up.railway.app
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGc...
+   ```
+3. `frontend/vercel.json` already rewrites all routes to `index.html` so React Router's client-side routes (e.g. `/leaderboard`, `/auth/callback`) don't 404 on direct navigation/refresh — no extra config needed.
+4. Deploy, then copy the resulting Vercel URL (e.g. `https://your-app.vercel.app`) back into Railway's `FRONTEND_ORIGIN` variable (step 3 above) and redeploy the backend — the FastAPI CORS middleware only allows that single configured origin.
+5. In Supabase Auth → URL Configuration, add the Vercel URL to the redirect allowlist (needed for Google OAuth and email confirmation links to work in production).
+
+---
+
 ## Roadmap
 
 ### Phase 1: Immediate Wins
@@ -441,7 +477,7 @@ This ensures only recent bidding data is served to users. Adjust as new terms be
 
 - **Frontend:** React \+ Vite (SF Pro Display / JetBrains Mono for numerals, system-native design), Recharts for data visualization
 - **Backend:** FastAPI (Supabase Auth incl. Google OAuth, Postgres for predictions + RPC leaderboards + LIVE auction tables)  
-- **Hosting:** Vercel (frontend), Supabase (backend)  
+- **Hosting:** Vercel (frontend), Railway (backend), Supabase (database + auth) — see "Deployment (Hosting)" above  
 - **Data:** \~50-100 curated historical BOSS rounds with real min/median bid data
 
 ---
